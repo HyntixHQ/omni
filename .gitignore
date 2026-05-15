@@ -1,0 +1,30 @@
+# Rust
+target/
+*.rs.bk
+
+# Environment
+.env
+
+# Editor
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+
+# Python (scripts)
+*.pyc
+__pycache__/
+
+# Project-specific
+debug_icon.rs
+.resources/
+.opencode/
+docs/
+omni-launcher-prd.md

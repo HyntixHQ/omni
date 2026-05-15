@@ -1,0 +1,19 @@
+[package]
+name = "omni-search"
+version = "0.1.0"
+edition.workspace = true
+authors.workspace = true
+homepage.workspace = true
+repository.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[lints]
+workspace = true
+
+[dependencies]
+omni-core = { path = "../omni-core" }
+anyhow.workspace = true
+fuzzy-matcher.workspace = true
+serde.workspace = true
+tracing.workspace = true
