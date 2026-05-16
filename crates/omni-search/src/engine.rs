@@ -23,7 +23,7 @@ impl SearchEngine {
             .filter_map(|entry| self.score_entry(query, entry))
             .collect();
 
-        results.sort_by(|a, b| b.score.cmp(&a.score));
+        results.sort_by_key(|b| std::cmp::Reverse(b.score));
         results.truncate(20);
         results
     }

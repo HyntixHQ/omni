@@ -1,14 +1,17 @@
 [workspace]
 resolver = "2"
 members = [
+    "crates/wisp",
+    "crates/wisp-components",
     "crates/omni-core",
     "crates/omni-search",
-    "crates/omni-ui",
+    "crates/omni-app-launcher",
+    "crates/omni-daemon",
 ]
 
 [package]
 name = "omni"
-version = "0.1.0"
+version = "0.2.0"
 edition.workspace = true
 authors.workspace = true
 homepage.workspace = true
@@ -32,7 +35,10 @@ tracing.workspace = true
 tracing-subscriber.workspace = true
 tiny-skia.workspace = true
 omni-core = { path = "crates/omni-core" }
-omni-ui = { path = "crates/omni-ui" }
+wisp = { path = "crates/wisp" }
+wisp-components = { path = "crates/wisp-components" }
+omni-app-launcher = { path = "crates/omni-app-launcher" }
+omni-daemon = { path = "crates/omni-daemon" }
 
 [workspace.package]
 publish = false
@@ -73,3 +79,4 @@ strip = "symbols"
 style = { level = "allow", priority = -1 }
 todo = "deny"
 dbg_macro = "deny"
+too_many_arguments = "allow"

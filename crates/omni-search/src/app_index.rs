@@ -79,7 +79,7 @@ fn parse_desktop_file(path: &std::path::Path) -> anyhow::Result<AppEntry> {
 
     let in_desktop_entry = std::cell::Cell::new(false);
 
-    for line in reader.lines().flatten() {
+    for line in reader.lines().map_while(Result::ok) {
         let line = line.trim().to_string();
         if line == "[Desktop Entry]" {
             in_desktop_entry.set(true);

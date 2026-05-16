@@ -19,6 +19,19 @@ cargo build --release
 target/release/omni
 ```
 
+## Project Structure
+
+```
+src/main.rs              — Thin entrypoint (daemon init, event loop, draw launcher frame)
+crates/
+  wisp/                  — GUI framework (Wayland, draw, input, text, events, style, scroll, cursors)
+  wisp-components/       — Widget library (badge, command, input, kbd, list_view, scroll_area, separator)
+  omni-core/             — Data models (AppEntry, SearchResult)
+  omni-search/           — Desktop file indexer + fuzzy search engine
+  omni-daemon/           — Business logic: Wayland connection, dispatch, event loop, surface management
+  omni-app-launcher/     — Launcher application: Config, OmniApp state, IconCache, draw function
+```
+
 ## Code Style
 
 - Follow existing patterns in the codebase
@@ -27,31 +40,13 @@ target/release/omni
 - Full words for variable names (no abbreviations)
 - Prefer modifying existing files over creating new ones
 - Never panic with `unwrap()` — propagate errors instead
-- Use variable shadowing to scope clones in async contexts
-
-## Project Structure
-
-```
-src/main.rs          — Binary entry point (Wayland event loop, SHM buffers)
-crates/
-  omni-core/         — Data models (AppEntry, SearchResult, etc.)
-  omni-search/       — Desktop file indexer + fuzzy search engine
-  omni-ui/           — Wayland shell, rendering, input handling, theming
-    components/      — Reusable UI components (scaffold, list-view, badge, etc.)
-    events.rs        — GPUI-inspired mouse hit region dispatcher
-    render.rs        — Drawing pipeline (tiny-skia + cosmic-text)
-    config.rs        — TOML configuration and system font/theme detection
-    state.rs         — Application state (OmniApp)
-```
 
 ## Pull Request Process
 
-1. Ensure the build passes with no warnings
+1. Ensure `cargo clippy` passes with zero warnings
 2. Keep PRs focused on a single change
-3. Use imperative PR titles (e.g. "Fix crash in search", not "Fixed crash" or "fix: crash")
-4. Include a `Release Notes:` section in the PR body with one bullet:
-   - `- Added ...` / `- Fixed ...` / `- Improved ...` for user-facing changes
-   - `- N/A` for non-user-facing changes
+3. Use imperative PR titles (e.g. "Fix crash in search", not "Fixed crash")
+4. Include a `Release Notes:` section in the PR body
 
 ## Commit Messages
 

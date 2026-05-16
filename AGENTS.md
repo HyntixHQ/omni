@@ -9,69 +9,69 @@ Rust 2024 edition Wayland-native app launcher. CPU-rendered with `tiny-skia` + `
 ```sh
 cargo build                    # debug build
 cargo build --release          # release with LTO, stripped
-cargo build -p omni-ui         # build single crate
+cargo clippy                   # lint check (zero warnings required)
 ```
-
-No tests, linters, or formatters set up beyond `cargo clippy` (see workspace config).
 
 ## Architecture
 
 ```
-src/main.rs            — binary entrypoint (Wayland event loop, SHM buffers, jemalloc)
+src/main.rs            — thin entrypoint (daemon init, event loop, draw)
 crates/
-  omni-core/           — data models (AppEntry, SearchResult, LauncherItem)
-  omni-search/         — desktop file indexer + fuzzy search (skim-based)
-  omni-ui/             — Wayland shell, rendering, input, theming, events
-    components/
-      scaffold         — layout shell with optional header/body/footer slots
-      list_view        — scrollable list (GPUI uniform_list replica)
-      badge            — shadcn-style (4 variants)
-      input_field      — search input with cursor
-      input            — XKB keyboard handler (US QWERTY fallback)
-    events.rs          — MouseDispatcher: per-frame hit region registration + hit testing
-    render.rs          — draw pipeline (tiny-skia → SHM buffer → Wayland)
-    config.rs          — TOML at ~/.config/omni/config.toml, system font auto-detect
-    state.rs           — OmniApp (search, cursor, selection, icon_cache, mouse dispatcher)
+  wisp/                — GUI framework
+    surface.rs         — WispSurface (layer-shell, SHM buffers)
+    input.rs           — WispInput (XKB), InputAction, MouseButton, scroll tracking
+    draw.rs            — fill_rect, draw_text, draw_pixmap, rounded rects, clipping
+    events.rs          — MouseDispatcher (hit regions, cursor resolution)
+    text.rs            — TextEditor (grapheme cursor, selection, clipboard)
+    style.rs           — Size enum (xs/sm/md/lg)
+    scroll.rs          — ScrollHandle, ScrollDelta, ScrollbarState
+    cursor.rs          — CursorBlink (500ms interval, 300ms pause)
+    cursor_style.rs    — CursorStyle (18 variants), CursorManager
+
+  wisp-components/     — shadcn/GPUI-style widgets
+    input.rs           — shadcn Input (size variants, prefix/suffix, focus ring)
+    list_view.rs       — ListState + draw_list (ScrollHandle, hover, selection)
+    badge.rs           — 4 variants (default/secondary/destructive/outline)
+    kbd.rs             — Keyboard shortcut display
+    separator.rs       — Horizontal/vertical divider
+    scroll_area.rs     — Scrollbar thumb
+    command.rs         — Command palette layout
+
+  omni-core/           — data models (AppEntry, SearchResult)
+  omni-search/         — desktop file indexer + fuzzy search
+  omni-daemon/         — business logic (Wayland dispatch, event loop)
+  omni-app-launcher/   — launcher Config, OmniApp, IconCache, draw
 ```
 
 ## Key conventions
 
-- **No `unwrap()`** — handle errors with `?` or `.log_err()`.
-- **No comments** unless explaining non-obvious logic.
-- **No mod.rs** — use `src/module_name.rs` for all modules.
-- **Full variable names** — no abbreviations.
-- **`dbg_macro` = deny, `todo` = deny** in Clippy config.
-- **`edition = "2024"`** across workspace.
-- **Release profile**: `lto = true`, `codegen-units = 1`, `strip = "symbols"`.
+- No `unwrap()` — handle errors with `?` or `.log_err()`.
+- No comments unless explaining non-obvious logic.
+- No `mod.rs` — use `src/module_name.rs`.
+- Full variable names — no abbreviations.
+- `dbg_macro` = deny, `todo` = deny in Clippy config.
+- `edition = "2024"` across workspace.
+- Release profile: `lto = true`, `codegen-units = 1`, `strip = "symbols"`.
 
 ## Rendering quirk
 
-All draw positions (`row_y`, `icon_y`, `text_y`) must be `.round()` to integer pixels. Tiny-Skia `floor()` and cosmic-text truncation diverge on fractional positions, causing 1px jitter between icons and text.
+All draw positions must be `.round()` to integer pixels. Tiny-Skia and cosmic-text diverge on fractional positions.
 
-## Scroll / navigation
+## Scroll
 
-`ListViewState::ensure_visible` uses GPUI's integer-row logic:
+- `ScrollHandle::ensure_visible` uses 0.5px EPSILON to prevent floating-point jitter.
+- Only fully visible items draw the active border. Background clips via `fill_rect_clipped`.
 
-```
-visible_rows = floor(viewport_height / row_height)
-current_row  = round(scroll_offset / row_height)
-last_visible = current_row + visible_rows - 1
+## Cursor blink
 
-UP:   sel < current_row   → scroll_offset = sel * row_height
-DOWN: sel > last_visible  → scroll_offset = (sel - visible_rows + 1) * row_height
-```
+- 500ms interval, 300ms pause after `CursorBlink::mark_activity()`.
 
-## Font loading
+## Input
 
-Only loads the configured font family (detected from GTK settings). See `src/main.rs:95-110` — temp scan → extract path → load single file. No `load_system_fonts()` in the final database.
-
-## Wayland
-
-- `wlr-layer-shell-v1` for overlay placement.
-- Custom SHM buffer pool for pixel data.
-- XKB keymap from `wl_keyboard.keymap` event.
-- Mouse regions registered per-frame by the scaffold.
+- `WispInput` tracks keyboard (XKB) + scroll + mouse state.
+- GPUI-aligned mouse methods: `mouse_enter/move/exit/button`.
+- `TextEditor` for grapheme-cluster cursor, selection, clipboard.
 
 ## Config
 
-Path: `~/.config/omni/config.toml` or `/etc/omni/config.toml`. All theme fields are hex colors (`#rrggbb`). Font family/size auto-detected from GTK `settings.ini` or `gsettings`.
+Path: `~/.config/omni/config.toml` or `/etc/omni/config.toml`. Theme fields use `#rrggbb` hex. Font family/size auto-detected from GTK.

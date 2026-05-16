@@ -547,15 +547,16 @@ dependencies = [
 
 [[package]]
 name = "omni"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "anyhow",
  "cosmic-text",
  "jemallocator",
  "libc",
  "memmap2",
+ "omni-app-launcher",
  "omni-core",
- "omni-ui",
+ "omni-daemon",
  "serde",
  "tiny-skia",
  "toml",
@@ -565,32 +566,13 @@ dependencies = [
  "wayland-cursor",
  "wayland-protocols",
  "wayland-protocols-wlr",
+ "wisp",
+ "wisp-components",
  "xkbcommon",
 ]
 
 [[package]]
-name = "omni-core"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "serde",
- "serde_json",
- "tracing",
-]
-
-[[package]]
-name = "omni-search"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "fuzzy-matcher",
- "omni-core",
- "serde",
- "tracing",
-]
-
-[[package]]
-name = "omni-ui"
+name = "omni-app-launcher"
 version = "0.1.0"
 dependencies = [
  "cosmic-text",
@@ -604,7 +586,44 @@ dependencies = [
  "toml",
  "tracing",
  "usvg",
- "xkbcommon",
+ "wisp",
+ "wisp-components",
+]
+
+[[package]]
+name = "omni-core"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "serde",
+ "serde_json",
+ "tracing",
+]
+
+[[package]]
+name = "omni-daemon"
+version = "0.1.0"
+dependencies = [
+ "cosmic-text",
+ "libc",
+ "memmap2",
+ "tiny-skia",
+ "tracing",
+ "wayland-client",
+ "wayland-protocols",
+ "wayland-protocols-wlr",
+ "wisp",
+]
+
+[[package]]
+name = "omni-search"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "fuzzy-matcher",
+ "omni-core",
+ "serde",
+ "tracing",
 ]
 
 [[package]]
@@ -1506,6 +1525,33 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "df79d97927682d2fd8adb29682d1140b343be4ac0f08fd68b7765d9c059d3945"
 dependencies = [
  "memchr",
+]
+
+[[package]]
+name = "wisp"
+version = "0.1.0"
+dependencies = [
+ "cosmic-text",
+ "libc",
+ "memmap2",
+ "tiny-skia",
+ "tracing",
+ "unicode-segmentation",
+ "wayland-client",
+ "wayland-cursor",
+ "wayland-protocols",
+ "wayland-protocols-wlr",
+ "xkbcommon",
+]
+
+[[package]]
+name = "wisp-components"
+version = "0.1.0"
+dependencies = [
+ "cosmic-text",
+ "tiny-skia",
+ "unicode-segmentation",
+ "wisp",
 ]
 
 [[package]]
