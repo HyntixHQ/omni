@@ -240,36 +240,39 @@ impl Dispatch<ZwlrLayerSurfaceV1, ()> for Inner {
         match event {
             zwlr_layer_surface_v1::Event::Configure { serial, width, height } => {
                 if let Some(surf) = state.surface.as_mut() {
-                    if surf.buffer.is_none() {
-                        if width > 0 && height > 0 {
-                            surf.width = width as i32;
-                            surf.height = height as i32;
-                        }
-                        surf.ack_configure(serial);
-                        surf.set_shm(state.shm.clone().expect("no shm"));
-
-                        // Create SHM pool + buffer + mmap
-                        let shm = state.shm.as_ref().expect("no shm").clone();
-                        let w = surf.width;
-                        let h = surf.height;
-                        let stride = w * 4;
-                        let buf_size = (h * stride) as usize;
-                        surf.pixmap = tiny_skia::Pixmap::new(
-                            width.max(1), height.max(1),
-                        ).expect("pixmap");
-                        let memfd = create_memfd(buf_size);
-                        let dup = unsafe { libc::fcntl(memfd, libc::F_DUPFD_CLOEXEC, 0) };
-                        let shm_file = unsafe { File::from_raw_fd(dup) };
-                        let mmap = unsafe { MmapMut::map_mut(&shm_file) }.expect("mmap");
-                        let pool_fd = unsafe { OwnedFd::from_raw_fd(memfd) };
-                        let pool = shm.create_pool(
-                            pool_fd.as_fd(), buf_size as i32, qh, (),
-                        );
-                        let buffer = pool.create_buffer(
-                            0, w, h, stride, wl_shm::Format::Argb8888, qh, (),
-                        );
-                        surf.set_buffers(pool, buffer, mmap);
+                    if width > 0 && height > 0 {
+                        surf.width = width as i32;
+                        surf.height = height as i32;
                     }
+                    surf.ack_configure(serial);
+
+                    let w = surf.width.max(1);
+                    let h = surf.height.max(1);
+
+                    if w <= 0 || h <= 0 { return; }
+
+                    let shm = match state.shm.as_ref() {
+                        Some(s) => s.clone(),
+                        None => return,
+                    };
+                    surf.set_shm(shm.clone());
+
+                    let stride = w * 4;
+                    let buf_size = (h * stride) as usize;
+                    surf.pixmap = tiny_skia::Pixmap::new(w as u32, h as u32).expect("pixmap");
+
+                    if let Some(old) = surf.buffer.take() { old.destroy(); }
+                    if let Some(old) = surf.pool.take() { old.destroy(); }
+                    drop(surf.mmap.take());
+
+                    let memfd = create_memfd(buf_size);
+                    let dup = unsafe { libc::fcntl(memfd, libc::F_DUPFD_CLOEXEC, 0) };
+                    let shm_file = unsafe { File::from_raw_fd(dup) };
+                    let mmap = unsafe { MmapMut::map_mut(&shm_file) }.expect("mmap");
+                    let pool_fd = unsafe { OwnedFd::from_raw_fd(memfd) };
+                    let pool = shm.create_pool(pool_fd.as_fd(), buf_size as i32, qh, ());
+                    let buffer = pool.create_buffer(0, w, h, stride, wl_shm::Format::Argb8888, qh, ());
+                    surf.set_buffers(pool, buffer, mmap);
                 }
                 state.dirty = true;
             }
@@ -371,6 +374,18 @@ impl Daemon {
             24,
         );
         self.inner.cursor = Some(cursor);
+    }
+
+    pub fn resize_surface(&mut self, width: i32, height: i32) {
+        if let Some(surf) = self.inner.surface.as_mut() {
+            surf.set_size(width as u32, height as u32);
+            surf.wl_surface.commit();
+        }
+        let _ = self.conn.flush();
+    }
+
+    pub fn surface_size(&self) -> (i32, i32) {
+        self.inner.surface.as_ref().map_or((0, 0), |s| (s.width, s.height))
     }
 
     pub fn mouse_y(&self) -> f32 {

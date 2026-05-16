@@ -7,6 +7,7 @@ members = [
     "crates/omni-search",
     "crates/omni-app-launcher",
     "crates/omni-daemon",
+    "crates/omni-calculator",
 ]
 
 [package]
@@ -39,6 +40,7 @@ wisp = { path = "crates/wisp" }
 wisp-components = { path = "crates/wisp-components" }
 omni-app-launcher = { path = "crates/omni-app-launcher" }
 omni-daemon = { path = "crates/omni-daemon" }
+omni-calculator = { version = "0.1.0", path = "crates/omni-calculator" }
 
 [workspace.package]
 publish = false
