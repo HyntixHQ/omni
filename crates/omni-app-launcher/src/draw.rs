@@ -116,6 +116,60 @@ pub fn draw_launcher_frame(
         &list_items, &mut app.list_state,
         font_size, font_family, &list_colors,
     );
+
+    // Footer / keyboard shortcuts
+    draw_launcher_footer(pixmap, font_system, swash_cache, cfg, w, h);
+}
+
+fn draw_launcher_footer(
+    pixmap: &mut Pixmap,
+    font_system: &mut cosmic_text::FontSystem,
+    swash_cache: &mut cosmic_text::SwashCache,
+    cfg: &Config,
+    window_w: f32,
+    window_h: f32,
+) {
+    let footer_h = FOOTER_HEIGHT;
+    let padding = PADDING;
+    let gap = 6.0;
+
+    // Divider line above footer
+    let divider_y = window_h - padding - footer_h - 8.0;
+    draw::fill_rect(pixmap, 0.0, divider_y, window_w, 1.0, color_from_hex(&cfg.theme.border));
+
+    // Footer row y
+    let footer_y = window_h - padding - footer_h;
+    let badge_y = footer_y + (footer_h - 20.0) / 2.0; // badge height = 20px
+
+    let shortcuts = [
+        ("\u{23CE}", "Launch", wisp_components::badge::BadgeVariant::Secondary),
+        ("\u{2191}\u{2193}", "Navigate", wisp_components::badge::BadgeVariant::Secondary),
+        ("Esc", "Quit", wisp_components::badge::BadgeVariant::Secondary),
+    ];
+
+    let mut cx = padding;
+
+    for (key, label, variant) in &shortcuts {
+        let (bw, _) = wisp_components::badge::badge(
+            pixmap, font_system, swash_cache, cx, badge_y,
+            &wisp_components::badge::BadgeProps {
+                text: key,
+                variant: *variant,
+                ..Default::default()
+            },
+            &cfg.font.family,
+        );
+        cx += bw + gap;
+
+        let label_x = cx;
+        draw::draw_text_clipped(
+            pixmap, font_system, swash_cache,
+            label_x, badge_y + 4.0, label, 11.0, &cfg.font.family,
+            color_from_hex(&cfg.theme.desc_fg),
+            0.0, window_h, 100.0,
+        );
+        cx += draw::text_width(font_system, label, 11.0, &cfg.font.family) + gap * 2.0;
+    }
 }
 
 fn draw_search_input(

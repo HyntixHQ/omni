@@ -35,11 +35,11 @@ fn main() {
     let visible_rows = 6.0f32;
     let padding = 10.0f32;
     let header_h = 42.0f32;
+    let footer_h = 28.0f32;
     let gap = 8.0f32;
     let body_h = (visible_rows * row_h).round();
-    let total_h = (padding + header_h + gap + body_h + padding).round() as i32;
+    let total_h = (padding + header_h + gap + body_h + gap + footer_h + padding).round() as i32;
     daemon.create_surface(config.window.width, total_h);
-    daemon.conn.flush().unwrap();
     daemon.conn.flush().unwrap();
 
     // Wait for configure
