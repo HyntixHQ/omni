@@ -69,6 +69,14 @@ pub struct BadgeProps<'a> {
     pub icon: Option<&'a Pixmap>,
 }
 
+/// Compute the width of a badge without drawing (for layout).
+pub fn badge_size(text: &str, font_system: &mut cosmic_text::FontSystem, font_family: &str) -> f32 {
+    let font_size = 12.0;
+    let padding_x = 8.0;
+    let text_w = draw::text_width(font_system, text, font_size, font_family);
+    text_w + padding_x * 2.0
+}
+
 /// Draw a badge matching shadcn spec exactly.
 ///
 /// Spec: h-5(20px) w-fit px-2(8px) py-0.5(2px) text-xs(12px) font-medium

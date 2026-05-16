@@ -60,7 +60,8 @@ pub fn draw_launcher_frame(
 
     // Body / list area
     let body_y = header_y + header_h + GAP;
-    let body_h = h - PADDING - body_y;
+    let footer_top = h - PADDING - FOOTER_HEIGHT - 8.0;
+    let body_h = (footer_top - body_y).max(0.0);
     app.mouse.register(
         wisp::events::RegionId::Body, body_y, body_h,
         wisp::CursorStyle::PointingHand,
@@ -135,21 +136,26 @@ fn draw_launcher_footer(
 
     // Divider line above footer
     let divider_y = window_h - padding - footer_h - 8.0;
-    draw::fill_rect(pixmap, 0.0, divider_y, window_w, 1.0, color_from_hex(&cfg.theme.border));
+    wisp_components::separator::separator(
+        pixmap, 0.0, divider_y, window_w,
+        &wisp_components::separator::SeparatorProps {
+            color: color_from_hex(&cfg.theme.border),
+            ..Default::default()
+        },
+    );
 
     // Footer row y
     let footer_y = window_h - padding - footer_h;
     let badge_y = footer_y + (footer_h - 20.0) / 2.0; // badge height = 20px
 
-    let shortcuts = [
-        ("\u{23CE}", "Launch", wisp_components::badge::BadgeVariant::Secondary),
+    let shortcuts_left = [
         ("\u{2191}\u{2193}", "Navigate", wisp_components::badge::BadgeVariant::Secondary),
-        ("Esc", "Quit", wisp_components::badge::BadgeVariant::Secondary),
+        ("\u{23CE}", "Launch", wisp_components::badge::BadgeVariant::Secondary),
     ];
 
     let mut cx = padding;
 
-    for (key, label, variant) in &shortcuts {
+    for (key, label, variant) in &shortcuts_left {
         let (bw, _) = wisp_components::badge::badge(
             pixmap, font_system, swash_cache, cx, badge_y,
             &wisp_components::badge::BadgeProps {
@@ -170,6 +176,31 @@ fn draw_launcher_footer(
         );
         cx += draw::text_width(font_system, label, 11.0, &cfg.font.family) + gap * 2.0;
     }
+
+    // Esc Quit — right-aligned
+    let quit_key = "Esc";
+    let quit_label = "Quit";
+    let quit_label_w = draw::text_width(font_system, quit_label, 11.0, &cfg.font.family);
+    let quit_badge_w = wisp_components::badge::badge_size(quit_key, font_system, &cfg.font.family);
+    let quit_total_w = quit_badge_w + gap + quit_label_w;
+    let quit_badge_x = window_w - padding - quit_total_w;
+    let quit_label_x = quit_badge_x + quit_badge_w + gap;
+
+    wisp_components::badge::badge(
+        pixmap, font_system, swash_cache, quit_badge_x, badge_y,
+        &wisp_components::badge::BadgeProps {
+            text: quit_key,
+            variant: wisp_components::badge::BadgeVariant::Secondary,
+            ..Default::default()
+        },
+        &cfg.font.family,
+    );
+    draw::draw_text_clipped(
+        pixmap, font_system, swash_cache,
+        quit_label_x, badge_y + 4.0, quit_label, 11.0, &cfg.font.family,
+        color_from_hex(&cfg.theme.desc_fg),
+        0.0, window_h, 100.0,
+    );
 }
 
 fn draw_search_input(

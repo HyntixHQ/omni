@@ -13,6 +13,9 @@ pub struct SeparatorProps {
     pub thickness: f32,
     pub color: tiny_skia::Color,
     pub alpha: u8,
+    /// shadcn: decorative controls whether the separator is a semantic
+    /// `role="separator"` or purely decorative. Does not affect rendering.
+    pub decorative: bool,
 }
 
 impl Default for SeparatorProps {
@@ -22,11 +25,28 @@ impl Default for SeparatorProps {
             thickness: 1.0,
             color: tiny_skia::Color::from_rgba8(69, 71, 90, 255),
             alpha: 255,
+            decorative: true,
         }
     }
 }
 
-/// Draws a shadcn-style separator (divider).
+/// GPUI-style convenience: horizontal separator with defaults.
+pub fn h_separator() -> SeparatorProps {
+    SeparatorProps {
+        orientation: SeparatorOrientation::Horizontal,
+        ..Default::default()
+    }
+}
+
+/// GPUI-style convenience: vertical separator with defaults.
+pub fn v_separator() -> SeparatorProps {
+    SeparatorProps {
+        orientation: SeparatorOrientation::Vertical,
+        ..Default::default()
+    }
+}
+
+/// Draws a shadcn/GPUI-style separator (divider).
 pub fn separator(pixmap: &mut Pixmap, x: f32, y: f32, length: f32, props: &SeparatorProps) {
     let mut c = props.color;
     let r = (c.red() * 255.0) as u8;
