@@ -15,7 +15,10 @@ cargo clippy                   # lint check (zero warnings required)
 ## Architecture
 
 ```
-src/main.rs            — thin entrypoint (daemon init, event loop, draw)
+src/main.rs            — entrypoint: daemon mode or IPC client
+  run_daemon()         — persistent background process
+  run_client()         — connects to daemon via IPC socket, sends command, exits
+
 crates/
   wisp/                — GUI framework
     surface.rs         — WispSurface (layer-shell, SHM buffers)
@@ -32,6 +35,7 @@ crates/
     input.rs           — shadcn Input (size variants, prefix/suffix, focus ring)
     list_view.rs       — ListState + draw_list (ScrollHandle, hover, selection)
     badge.rs           — 4 variants (default/secondary/destructive/outline)
+    label.rs           — shadcn Label (text-sm, font-medium, disabled opacity)
     kbd.rs             — Keyboard shortcut display
     separator.rs       — Horizontal/vertical divider
     scroll_area.rs     — Scrollbar thumb
@@ -39,9 +43,17 @@ crates/
 
   omni-core/           — data models (AppEntry, SearchResult)
   omni-search/         — desktop file indexer + fuzzy search
-  omni-daemon/         — business logic (Wayland dispatch, event loop)
+  omni-daemon/         — IPC-aware daemon (Wayland dispatch, poll loop, socket)
   omni-app-launcher/   — launcher Config, OmniApp, IconCache, draw
+  omni-calculator/     — CalcState, draw_calculator (evalexpr)
 ```
+
+### Daemon IPC
+
+- Abstract Unix socket `@omni-ipc`
+- Single `poll()`: Wayland fd + IPC listener + client fds
+- LF-delimited commands: `launcher`, `calculator`, `calculator:expr`, `quit`
+- Surface hides on dismiss (attach null), stays alive for next IPC command
 
 ## Key conventions
 

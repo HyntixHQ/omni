@@ -8,6 +8,7 @@ members = [
     "crates/omni-app-launcher",
     "crates/omni-daemon",
     "crates/omni-calculator",
+    "crates/omni-ipc",
 ]
 
 [package]
@@ -40,7 +41,9 @@ wisp = { path = "crates/wisp" }
 wisp-components = { path = "crates/wisp-components" }
 omni-app-launcher = { path = "crates/omni-app-launcher" }
 omni-daemon = { path = "crates/omni-daemon" }
-omni-calculator = { version = "0.1.0", path = "crates/omni-calculator" }
+omni-ipc = { path = "crates/omni-ipc" }
+omni-calculator = { path = "crates/omni-calculator" }
+omni-search = { path = "crates/omni-search" }
 
 [workspace.package]
 publish = false
@@ -71,6 +74,7 @@ toml = "0.8"
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["fmt", "env-filter"] }
 fuzzy-matcher = "0.3"
+wayland-scanner = "0.31"
 
 [profile.release]
 lto = true

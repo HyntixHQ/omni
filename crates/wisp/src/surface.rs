@@ -52,13 +52,17 @@ impl WispSurface {
         self.shm = Some(shm);
     }
 
-    /// Set the SHM pool, buffer, and mmap. The caller creates these using their own QueueHandle.
+    /// Set new pool/buffer/mmap without destroying old ones.
+    /// Old pool/buffer are leaked to avoid sending destroy-while-unreleased, which
+    /// is a Wayland protocol violation.  Resources are reclaimed on connection close.
     pub fn set_buffers(
         &mut self,
         pool: wl_shm_pool::WlShmPool,
         buffer: wl_buffer::WlBuffer,
         mmap: MmapMut,
     ) {
+        if let Some(old) = self.buffer.take() { std::mem::forget(old); }
+        if let Some(old) = self.pool.take() { std::mem::forget(old); }
         self.pool = Some(pool);
         self.buffer = Some(buffer);
         self.mmap = Some(mmap);
@@ -135,6 +139,12 @@ impl WispSurface {
             self.wl_surface.damage_buffer(0, 0, self.width, self.height);
             self.wl_surface.commit();
         }
+    }
+
+    /// Recreate the pixmap without touching buffers/mmap — used when re-showing
+    /// at the same size as before.
+    pub fn rebuild_pixmap(&mut self, width: i32, height: i32) {
+        self.pixmap = tiny_skia::Pixmap::new(width as u32, height as u32).expect("pixmap");
     }
 
     pub fn hide(&self) {

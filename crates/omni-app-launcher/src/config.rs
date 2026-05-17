@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use std::path::PathBuf;
 
 use serde::{Deserialize, Serialize};
@@ -8,6 +9,8 @@ pub struct Config {
     pub theme: ThemeConfig,
     pub font: FontConfig,
     pub icons: IconConfig,
+    #[serde(default)]
+    pub shortcuts: ShortcutsConfig,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -51,6 +54,24 @@ pub struct IconConfig {
     pub theme: String,
     pub cursor_theme: String,
     pub size: i32,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ShortcutsConfig {
+    pub launcher: Option<String>,
+    pub calculator: Option<String>,
+    #[serde(default)]
+    pub apps: HashMap<String, String>,
+}
+
+impl Default for ShortcutsConfig {
+    fn default() -> Self {
+        Self {
+            launcher: Some("Super+Space".into()),
+            calculator: Some("Super+Alt+C".into()),
+            apps: HashMap::new(),
+        }
+    }
 }
 
 impl Default for ThemeConfig {
@@ -132,7 +153,7 @@ impl Config {
     }
 
     fn apply_overrides(&mut self, overrides: Config) {
-        let Config { window, theme, font, icons } = overrides;
+        let Config { window, theme, font, icons, shortcuts } = overrides;
         if window.width != WindowConfig::default().width { self.window.width = window.width; }
         self.window.height = window.height;
         self.window.margin = window.margin;
@@ -143,6 +164,7 @@ impl Config {
         if !icons.theme.is_empty() { self.icons.theme = icons.theme; }
         if !icons.cursor_theme.is_empty() { self.icons.cursor_theme = icons.cursor_theme; }
         self.icons.size = icons.size;
+        self.shortcuts = shortcuts;
     }
 }
 

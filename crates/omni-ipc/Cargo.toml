@@ -1,0 +1,16 @@
+[package]
+name = "omni-ipc"
+version = "0.1.0"
+edition.workspace = true
+authors.workspace = true
+homepage.workspace = true
+repository.workspace = true
+license.workspace = true
+publish = false
+
+[lints]
+workspace = true
+
+[dependencies]
+libc.workspace = true
+tracing.workspace = true

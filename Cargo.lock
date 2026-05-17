@@ -564,6 +564,8 @@ dependencies = [
  "omni-calculator",
  "omni-core",
  "omni-daemon",
+ "omni-ipc",
+ "omni-search",
  "serde",
  "tiny-skia",
  "toml",
@@ -625,12 +627,23 @@ dependencies = [
  "cosmic-text",
  "libc",
  "memmap2",
+ "omni-ipc",
  "tiny-skia",
  "tracing",
+ "wayland-backend",
  "wayland-client",
  "wayland-protocols",
  "wayland-protocols-wlr",
+ "wayland-scanner",
  "wisp",
+]
+
+[[package]]
+name = "omni-ipc"
+version = "0.1.0"
+dependencies = [
+ "libc",
+ "tracing",
 ]
 
 [[package]]

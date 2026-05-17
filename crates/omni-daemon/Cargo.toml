@@ -13,6 +13,7 @@ workspace = true
 
 [dependencies]
 wisp = { path = "../wisp" }
+omni-ipc = { path = "../omni-ipc" }
 wayland-client.workspace = true
 wayland-protocols.workspace = true
 wayland-protocols-wlr = { workspace = true, features = ["client"] }
@@ -21,3 +22,5 @@ tiny-skia.workspace = true
 libc.workspace = true
 memmap2.workspace = true
 tracing.workspace = true
+wayland-scanner.workspace = true
+wayland-backend = "0.3"

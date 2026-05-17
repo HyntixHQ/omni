@@ -1,6 +1,7 @@
 use std::fs::File;
-use std::os::fd::{AsRawFd, FromRawFd};
-use std::os::unix::io::{AsFd, OwnedFd, RawFd};
+use std::io::Read;
+use std::os::fd::{AsFd, AsRawFd, FromRawFd, OwnedFd, RawFd};
+use std::os::unix::net::{UnixListener, UnixStream};
 
 use cosmic_text::{FontSystem, SwashCache};
 use libc::off_t;
@@ -9,6 +10,7 @@ use wayland_client::protocol::{
     wl_buffer, wl_compositor, wl_keyboard, wl_pointer, wl_registry, wl_seat, wl_shm, wl_shm_pool,
     wl_surface,
 };
+use wayland_backend::client::WaylandError;
 use wayland_client::{delegate_noop, Connection, Dispatch, EventQueue, QueueHandle, WEnum};
 use wayland_protocols_wlr::layer_shell::v1::client::zwlr_layer_shell_v1::{
     self, ZwlrLayerShellV1,
@@ -20,6 +22,10 @@ use wayland_protocols_wlr::layer_shell::v1::client::zwlr_layer_surface_v1::{
 use wisp::input::{InputAction, WispInput};
 use wisp::surface::WispSurface;
 use wisp::{CursorBlink, CursorManager};
+
+use omni_ipc::IpcCommand;
+
+use crate::shortcuts::{HyprlandGlobalShortcutsManagerV1, ShortcutAction, ShortcutManager};
 
 fn create_memfd(size: usize) -> RawFd {
     unsafe {
@@ -35,6 +41,32 @@ fn create_memfd(size: usize) -> RawFd {
 
 fn dup_fd(fd: std::os::unix::io::RawFd) -> std::os::unix::io::RawFd {
     unsafe { libc::fcntl(fd, libc::F_DUPFD_CLOEXEC, 0) }
+}
+
+fn create_surface_buffers(
+    surf: &mut WispSurface,
+    shm: &wl_shm::WlShm,
+    w: i32,
+    h: i32,
+    qh: &QueueHandle<Inner>,
+) {
+    let stride = w * 4;
+    let buf_size = (h * stride) as usize;
+    surf.pixmap = tiny_skia::Pixmap::new(w as u32, h as u32).expect("pixmap");
+
+    // Keep old buffer/pool alive (don't destroy) — the compositor may not have sent
+    // the release event yet after hide, and destroying an unreleased buffer is a
+    // protocol violation. Old resources are reclaimed when the surface is destroyed.
+    drop(surf.mmap.take());
+
+    let memfd = create_memfd(buf_size);
+    let dup = dup_fd(memfd);
+    let shm_file = unsafe { File::from_raw_fd(dup) };
+    let mmap = unsafe { MmapMut::map_mut(&shm_file) }.expect("mmap");
+    let pool_fd = unsafe { OwnedFd::from_raw_fd(memfd) };
+    let pool = shm.create_pool(pool_fd.as_fd(), buf_size as i32, qh, ());
+    let buffer = pool.create_buffer(0, w, h, stride, wl_shm::Format::Argb8888, qh, ());
+    surf.set_buffers(pool, buffer, mmap);
 }
 
 /// Dispatch state — owns Wayland objects and queued actions.
@@ -55,6 +87,13 @@ pub struct Inner {
     pub pointer: Option<wl_pointer::WlPointer>,
     pub compositor: Option<wl_compositor::WlCompositor>,
     pub layer_shell: Option<ZwlrLayerShellV1>,
+    pub ipc_listener: Option<UnixListener>,
+    pub ipc_actions: Vec<IpcCommand>,
+    pub ipc_clients: Vec<UnixStream>,
+    pub ipc_buf: Vec<u8>,
+    pub surface_visible: bool,
+    pub pending_shortcut: Option<ShortcutAction>,
+    pub shortcut_manager: ShortcutManager,
 }
 
 delegate_noop!(Inner: ignore wl_compositor::WlCompositor);
@@ -63,6 +102,7 @@ delegate_noop!(Inner: ignore wl_shm::WlShm);
 delegate_noop!(Inner: ignore wl_shm_pool::WlShmPool);
 delegate_noop!(Inner: ignore wl_buffer::WlBuffer);
 delegate_noop!(Inner: ignore ZwlrLayerShellV1);
+delegate_noop!(Inner: ignore HyprlandGlobalShortcutsManagerV1);
 
 impl Dispatch<wl_registry::WlRegistry, ()> for Inner {
     fn event(
@@ -92,6 +132,10 @@ impl Dispatch<wl_registry::WlRegistry, ()> for Inner {
                 }
                 "wl_seat" => {
                     let _ = registry.bind::<wl_seat::WlSeat, _, _>(name, 7, qh, ());
+                }
+                "hyprland_global_shortcuts_manager_v1" => {
+                    let mgr = registry.bind::<HyprlandGlobalShortcutsManagerV1, _, _>(name, 1, qh, ());
+                    state.shortcut_manager.init(&mgr, qh);
                 }
                 _ => {}
             }
@@ -251,28 +295,16 @@ impl Dispatch<ZwlrLayerSurfaceV1, ()> for Inner {
 
                     if w <= 0 || h <= 0 { return; }
 
-                    let shm = match state.shm.as_ref() {
-                        Some(s) => s.clone(),
-                        None => return,
-                    };
-                    surf.set_shm(shm.clone());
+                    let same_size = surf.pixmap.width() == w as u32 && surf.pixmap.height() == h as u32;
+                    if same_size && surf.buffer.is_some() {
+                        state.dirty = true;
+                        return;
+                    }
 
-                    let stride = w * 4;
-                    let buf_size = (h * stride) as usize;
-                    surf.pixmap = tiny_skia::Pixmap::new(w as u32, h as u32).expect("pixmap");
-
-                    if let Some(old) = surf.buffer.take() { old.destroy(); }
-                    if let Some(old) = surf.pool.take() { old.destroy(); }
-                    drop(surf.mmap.take());
-
-                    let memfd = create_memfd(buf_size);
-                    let dup = unsafe { libc::fcntl(memfd, libc::F_DUPFD_CLOEXEC, 0) };
-                    let shm_file = unsafe { File::from_raw_fd(dup) };
-                    let mmap = unsafe { MmapMut::map_mut(&shm_file) }.expect("mmap");
-                    let pool_fd = unsafe { OwnedFd::from_raw_fd(memfd) };
-                    let pool = shm.create_pool(pool_fd.as_fd(), buf_size as i32, qh, ());
-                    let buffer = pool.create_buffer(0, w, h, stride, wl_shm::Format::Argb8888, qh, ());
-                    surf.set_buffers(pool, buffer, mmap);
+                    if let Some(shm) = state.shm.clone() {
+                        surf.set_shm(shm.clone());
+                        create_surface_buffers(surf, &shm, w, h, qh);
+                    }
                 }
                 state.dirty = true;
             }
@@ -324,6 +356,13 @@ impl Daemon {
             pointer: None,
             compositor: None,
             layer_shell: None,
+            ipc_listener: None,
+            ipc_actions: Vec::new(),
+            ipc_clients: Vec::new(),
+            ipc_buf: Vec::new(),
+            surface_visible: false,
+            pending_shortcut: None,
+            shortcut_manager: ShortcutManager::new(),
         };
 
         Daemon { conn, event_queue, inner: Box::new(inner), font_system, swash_cache }
@@ -333,6 +372,15 @@ impl Daemon {
         let qh = self.event_queue.handle();
         self.conn.display().get_registry(&qh, ());
         self.event_queue.roundtrip(&mut *self.inner).expect("registry roundtrip");
+    }
+
+    pub fn init_ipc(&mut self) {
+        match omni_ipc::bind_abstract("omni-ipc") {
+            Ok(listener) => {
+                self.inner.ipc_listener = Some(listener);
+            }
+            Err(e) => tracing::error!("Failed to bind IPC socket: {}", e),
+        }
     }
 
     pub fn create_surface(&mut self, width: i32, height: i32) {
@@ -388,6 +436,33 @@ impl Daemon {
         self.inner.surface.as_ref().map_or((0, 0), |s| (s.width, s.height))
     }
 
+    pub fn hide_surface(&mut self) {
+        if let Some(surf) = self.inner.surface.as_mut() {
+            surf.wl_surface.attach(None::<&wl_buffer::WlBuffer>, 0, 0);
+            surf.wl_surface.commit();
+        }
+        self.inner.surface_visible = false;
+        let _ = self.conn.flush();
+    }
+
+    pub fn show_surface(&mut self, width: i32, height: i32) {
+        {
+            let surf = self.inner.surface.as_mut();
+            if let Some(surf) = surf {
+                surf.set_size(width as u32, height as u32);
+                surf.wl_surface.commit();
+            }
+        }
+        let _ = self.conn.flush();
+        let _ = self.event_queue.roundtrip(&mut *self.inner).ok();
+        if let Some(surf) = self.inner.surface.as_mut() {
+            if surf.buffer.is_some() && surf.mmap.is_some() {
+                surf.rebuild_pixmap(width, height);
+            }
+        }
+        self.inner.surface_visible = true;
+    }
+
     pub fn mouse_y(&self) -> f32 {
         self.inner.input.mouse_y()
     }
@@ -413,6 +488,10 @@ impl Daemon {
         self.inner.surface.as_mut().expect("surface not initialized")
     }
 
+    pub fn drain_shortcut_command(&mut self) -> Option<ShortcutAction> {
+        self.inner.pending_shortcut.take()
+    }
+
     /// Cursor blink — delegates to wisp::CursorBlink (GPUI-compatible).
     pub fn cursor_visible(&self) -> bool {
         self.inner.cursor_blink.visible()
@@ -425,24 +504,164 @@ impl Daemon {
 
     pub fn poll(&mut self) -> bool {
         let _ = self.conn.flush();
-        if let Some(guard) = self.event_queue.prepare_read() {
-            let fd = self.conn.as_fd().as_raw_fd();
-            let mut poll_fd = libc::pollfd {
-                fd,
+
+        // Build poll fd set: wayland + ipc listener + ipc clients
+        let mut poll_fds = Vec::new();
+        poll_fds.push(libc::pollfd {
+            fd: self.conn.as_fd().as_raw_fd(),
+            events: libc::POLLIN,
+            revents: 0,
+        });
+        if let Some(ref listener) = self.inner.ipc_listener {
+            poll_fds.push(libc::pollfd {
+                fd: listener.as_raw_fd(),
                 events: libc::POLLIN,
                 revents: 0,
-            };
-            let _ret = unsafe { libc::poll(&mut poll_fd, 1, 16) };
-            if poll_fd.revents & libc::POLLIN != 0 {
-                let _ = guard.read();
+            });
+        }
+        let client_offset = poll_fds.len();
+        for client in &self.inner.ipc_clients {
+            poll_fds.push(libc::pollfd {
+                fd: client.as_raw_fd(),
+                events: libc::POLLIN,
+                revents: 0,
+            });
+        }
+
+        // Flush explicitly before prepare_read. If the compositor already closed the
+        // connection (e.g. due to a protocol error), the flush will fail with EPIPE here,
+        // and we can still dispatch any protocol-error event already in the socket buffer.
+        if let Err(WaylandError::Io(_)) = self.conn.flush() {
+            // The compositor likely disconnected. Try to dispatch any events that may
+            // already be in the buffer (e.g. a protocol error from a previous read).
+            match self.event_queue.dispatch_pending(&mut *self.inner) {
+                Err(wayland_client::DispatchError::Backend(WaylandError::Protocol(err))) => {
+                    tracing::error!(
+                        "wayland: protocol error (flush failed): object={}@{} code={} message={:?}, shutting down",
+                        err.object_interface, err.object_id, err.code, err.message,
+                    );
+                }
+                Err(e) => {
+                    tracing::error!("wayland: disconnection, flush+dispatch failed: {e}");
+                }
+                Ok(_) => {
+                    tracing::error!("wayland: compositor disconnected (flush EPIPE, no protocol error)");
+                }
+            }
+            self.inner.running = false;
+            return false;
+        }
+
+        let read_guard = self.event_queue.prepare_read();
+        let poll_ret = unsafe {
+            libc::poll(poll_fds.as_mut_ptr(), poll_fds.len() as _, 16)
+        };
+        if let Some(guard) = read_guard {
+            let wl_revents = poll_fds[0].revents;
+            if wl_revents & libc::POLLIN != 0 {
+                match guard.read() {
+                    Err(WaylandError::Protocol(err)) => {
+                        tracing::error!(
+                            "wayland: protocol error (poll_ret={poll_ret}, revents={wl_revents:#06x}): \
+                             object={}@{} code={} message={:?}, shutting down",
+                            err.object_interface, err.object_id, err.code, err.message,
+                        );
+                        self.inner.running = false;
+                        return false;
+                    }
+                    Err(WaylandError::Io(e)) => {
+                        // guard.read() flushes internally; if the compositor disconnected
+                        // between our flush above and this one, try dispatch_pending.
+                        match self.event_queue.dispatch_pending(&mut *self.inner) {
+                            Err(wayland_client::DispatchError::Backend(WaylandError::Protocol(err))) => {
+                                tracing::error!(
+                                    "wayland: protocol error after io error: object={}@{} code={} message={:?}, shutting down",
+                                    err.object_interface, err.object_id, err.code, err.message,
+                                );
+                            }
+                            Err(dispatch_err) => {
+                                tracing::error!(
+                                    "wayland: io error (poll_ret={poll_ret}, revents={wl_revents:#06x}): {}; \
+                                     dispatch error: {}",
+                                    e, dispatch_err,
+                                );
+                            }
+                            Ok(_) => {
+                                tracing::error!(
+                                    "wayland: io error (poll_ret={poll_ret}, revents={wl_revents:#06x}): {}, shutting down",
+                                    e,
+                                );
+                            }
+                        }
+                        self.inner.running = false;
+                        return false;
+                    }
+                    Ok(_) => {}
+                }
+            } else if wl_revents & (libc::POLLHUP | libc::POLLERR) != 0 {
+                tracing::error!("wayland: fd hung up (revents={wl_revents:#06x}), shutting down");
+                self.inner.running = false;
+                return false;
+            }
+        } else if poll_fds[0].revents & (libc::POLLHUP | libc::POLLERR) != 0 {
+            tracing::error!("wayland: fd error (revents={:#x}), shutting down", poll_fds[0].revents);
+            self.inner.running = false;
+            return false;
+        }
+        if let Err(e) = self.event_queue.dispatch_pending(&mut *self.inner) {
+            if let wayland_client::DispatchError::Backend(WaylandError::Protocol(err)) = &e {
+                tracing::error!(
+                    "wayland: protocol error: object={}@{} code={} message={:?}, shutting down",
+                    err.object_interface, err.object_id, err.code, err.message,
+                );
+            } else {
+                tracing::error!("wayland: dispatch error: {e}");
+            }
+            self.inner.running = false;
+            return false;
+        }
+
+        // Accept new IPC connections
+        if let Some(ref listener) = self.inner.ipc_listener {
+            if poll_fds.get(1).is_some_and(|p| p.revents & libc::POLLIN != 0) {
+                while let Ok((client, _)) = listener.accept() {
+                    client.set_nonblocking(true).ok();
+                    self.inner.ipc_clients.push(client);
+                }
             }
         }
-        self.event_queue.dispatch_pending(&mut *self.inner).unwrap();
+
+        // Read from IPC clients
+        let mut to_remove: Vec<usize> = Vec::new();
+        for (i, mut client) in self.inner.ipc_clients.iter().enumerate() {
+            let pf_index = client_offset + i;
+            if pf_index >= poll_fds.len() { break; }
+            if poll_fds[pf_index].revents & libc::POLLIN == 0 { continue; }
+
+            let mut buf = [0u8; 4096];
+            match client.read(&mut buf) {
+                Ok(0) => to_remove.push(i),
+                Ok(n) => {
+                    let cmds = omni_ipc::read_commands_from_buf(&mut self.inner.ipc_buf, &buf[..n]);
+                    self.inner.ipc_actions.extend(cmds);
+                }
+                Err(e) if e.kind() == std::io::ErrorKind::WouldBlock => {}
+                Err(_) => to_remove.push(i),
+            }
+        }
+        for i in to_remove.into_iter().rev() {
+            self.inner.ipc_clients.swap_remove(i);
+        }
+
         self.inner.running
     }
 
     pub fn drain_actions(&mut self) -> Vec<InputAction> {
         std::mem::take(&mut self.inner.actions)
+    }
+
+    pub fn drain_ipc_actions(&mut self) -> Vec<IpcCommand> {
+        std::mem::take(&mut self.inner.ipc_actions)
     }
 
     pub fn process_repeat(&mut self) -> Option<InputAction> {
