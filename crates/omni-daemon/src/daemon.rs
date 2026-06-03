@@ -283,7 +283,10 @@ impl Dispatch<wl_pointer::WlPointer, ()> for Inner {
                     0x112 => wisp::MouseButton::Middle,
                     _ => return,
                 };
-                state.input.mouse_button(mb, pressed);
+                let action = state.input.mouse_button(mb, pressed);
+                if !matches!(action, InputAction::None) {
+                    state.actions.push(action);
+                }
                 state.dirty = true;
             }
             wl_pointer::Event::Axis { axis: WEnum::Value(wl_pointer::Axis::VerticalScroll), value, .. } => {

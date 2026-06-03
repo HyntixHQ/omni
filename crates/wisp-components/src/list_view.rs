@@ -166,10 +166,10 @@ pub fn draw_list(
         let is_hovered = state.hover_index == Some(i);
         let is_active = item.selected && colors.active_highlight;
 
-        // Items clipped to viewport [y, y+h] — background, text, icons all clip individually
+        // Items clipped to per-row bounds — background, text, icons all clip individually
         if item.selected || is_hovered {
             let bg = if item.selected { colors.active_bg } else { colors.hover };
-            draw::fill_rect_clipped(pixmap, x, row_y, w, row_h_actual, 4.0, bg, y, y + h);
+            draw::fill_rect_clipped(pixmap, x, row_y, w, row_h_actual, 4.0, bg, row_y, row_y + row_h_actual);
         }
 
         // Border — only when fully visible (no partial border overflow)
@@ -187,35 +187,37 @@ pub fn draw_list(
         let icon_x = x + padding_x;
 
         if let Some(icon) = item.prefix_icon {
-            draw::draw_pixmap_clipped(pixmap, icon, icon_x, icon_y, y, y + h);
+            draw::draw_pixmap_clipped(pixmap, icon, icon_x, icon_y, row_y, row_y + row_h_actual);
         }
 
         let text_x = if has_prefix { x + padding_x + icon_size + gap } else { x + padding_x };
         let max_text_w = if has_suffix { w - (text_x - x) - padding_x - icon_size - gap } else { w - (text_x - x) - padding_x };
-        let text_y = (row_y + (row_h - 4.0 - row_content_h) / 2.0).round();
+        let content_h = if item.subtitle.is_some() { row_content_h } else { name_h };
+        let text_y = (row_y + (row_h - 4.0 - content_h) / 2.0).round();
 
-        // Title
+        // Title — clip to name line area only (prevents wrap bleed into subtitle space)
         draw::draw_text_clipped(
             pixmap, font_system, swash_cache,
             text_x, text_y, item.title, font_size, font_family, name_color,
-            y, y + h, max_text_w,
+            text_y, text_y + name_h, max_text_w,
         );
 
         // Subtitle
         if let Some(desc) = item.subtitle {
             let desc_y = (text_y + name_h + 2.0).round();
             let desc_color = if item.selected { colors.selected_desc_fg } else { colors.desc_fg };
+            // Subtitle — clip to desc line area only
             draw::draw_text_clipped(
                 pixmap, font_system, swash_cache,
                 text_x, desc_y, desc, desc_size, font_family, desc_color,
-                y, y + h, max_text_w,
+                desc_y, desc_y + desc_h, max_text_w,
             );
         }
 
         // Suffix icon
         if let Some(suffix) = item.suffix_icon {
             let sx = (x + w - padding_x - icon_size).round();
-            draw::draw_pixmap_clipped(pixmap, suffix, sx, icon_y, y, y + h);
+            draw::draw_pixmap_clipped(pixmap, suffix, sx, icon_y, row_y, row_y + row_h_actual);
         }
     }
 }

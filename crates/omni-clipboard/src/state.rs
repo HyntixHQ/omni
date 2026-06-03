@@ -1,4 +1,6 @@
 use tiny_skia::{Color, Pixmap};
+use wisp::events::MouseDispatcher;
+use wisp::CursorStyle;
 use wisp_components::list_view::{self, ListColors, ListItem, ListState};
 
 pub const CLIPBOARD_WIDTH: i32 = 400;
@@ -14,6 +16,7 @@ pub struct ClipboardState {
     pub entries: Vec<ClipboardEntry>,
     pub filter: String,
     pub list_state: ListState,
+    pub mouse: MouseDispatcher,
 }
 
 impl ClipboardState {
@@ -22,6 +25,7 @@ impl ClipboardState {
             entries: Vec::new(),
             filter: String::new(),
             list_state: ListState::new(),
+            mouse: MouseDispatcher::new(),
         }
     }
 
@@ -30,6 +34,7 @@ impl ClipboardState {
             entries,
             filter: String::new(),
             list_state: ListState::new(),
+            mouse: MouseDispatcher::new(),
         }
     }
 
@@ -165,6 +170,9 @@ pub fn draw_clipboard(
     // List
     let list_y = 6.0 + 42.0 + gap;
     let list_h = h - list_y - footer_h - pad;
+
+    state.mouse.clear();
+    state.mouse.register(wisp::events::RegionId::Body, list_y, list_h, CursorStyle::PointingHand);
     let row_h = list_view::row_height_compact(font_system, font_size, font_family);
     let filtered = state.filtered();
     let list_len = filtered.len();

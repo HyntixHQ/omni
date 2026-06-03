@@ -336,6 +336,25 @@ fn run_daemon(config: Config) {
                             InputAction::Cancel => {
                                 hide = true;
                             }
+                            InputAction::Click { x: _, y } => {
+                                if let Some((body_y, _)) = app.mouse.body_bounds() {
+                                    let row_height = omni_app_launcher::draw::compute_row_height(
+                                        daemon.font_system_mut(),
+                                        config.font.size as f32,
+                                        &config.font.family,
+                                    );
+                                    let rel_y = y as f32 - body_y;
+                                    if let Some(idx) = app.list_state.index_at(rel_y, row_height)
+                                        && idx < app.results.len()
+                                    {
+                                        app.selected_index = idx;
+                                        app.list_state.selected_index = idx;
+                                        let exec = app.results[idx].entry.exec.clone();
+                                        OmniApp::launch_selected(&exec);
+                                    }
+                                    hide = true;
+                                }
+                            }
                             _ => {
                                 let row_height = omni_app_launcher::draw::compute_row_height(
                                     daemon.font_system_mut(),
@@ -424,6 +443,23 @@ fn run_daemon(config: Config) {
                             }
                             InputAction::Cancel => {
                                 hide = true;
+                            }
+                            InputAction::Click { x: _, y } => {
+                                if let Some((body_y, _)) = clipboard_state.mouse.body_bounds() {
+                                    let row_h = wisp_components::list_view::row_height_compact(
+                                        daemon.font_system_mut(),
+                                        config.font.size as f32,
+                                        &config.font.family,
+                                    );
+                                    let rel_y = y as f32 - body_y;
+                                    if let Some(idx) = clipboard_state.list_state.index_at(rel_y, row_h) {
+                                        let items = clipboard_state.filtered();
+                                        if idx < items.len() {
+                                            daemon.clipboard_paste(&items[idx].text);
+                                        }
+                                    }
+                                    hide = true;
+                                }
                             }
                             InputAction::SelectNext => {
                                 clipboard_state.select_next();

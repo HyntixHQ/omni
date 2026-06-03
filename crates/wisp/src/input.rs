@@ -6,6 +6,7 @@ use xkbcommon::xkb;
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum InputAction {
     None,
+    Click { x: i32, y: i32 },
     AppendChar(char),
     Backspace,
     Delete,
@@ -237,11 +238,19 @@ impl WispInput {
     }
 
     /// Called on wl_pointer::Button with pressed state (GPUI: MouseDownEvent / MouseUpEvent).
-    pub fn mouse_button(&mut self, button: MouseButton, pressed: bool) {
+    /// Returns a Click action on button release.
+    pub fn mouse_button(&mut self, button: MouseButton, pressed: bool) -> InputAction {
         if pressed {
             self.mouse_pressed_button = Some(button);
-        } else {
+            InputAction::None
+        } else if self.mouse_pressed_button == Some(button) {
             self.mouse_pressed_button = None;
+            InputAction::Click {
+                x: self.mouse_x as i32,
+                y: self.mouse_y as i32,
+            }
+        } else {
+            InputAction::None
         }
     }
 }

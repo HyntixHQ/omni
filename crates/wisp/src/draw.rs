@@ -164,6 +164,7 @@ pub fn text_width(font_system: &mut cosmic_text::FontSystem, text: &str, font_si
     let attrs = cosmic_text::Attrs::new().family(cosmic_text::Family::Name(font_family));
     let mut buffer = cosmic_text::Buffer::new(font_system, cosmic_text::Metrics::new(font_size, font_size));
     buffer.set_text(font_system, text, attrs, cosmic_text::Shaping::Advanced);
+    buffer.shape_until_scroll(font_system, true);
     buffer.lines.iter().fold(0.0f32, |max, line| {
         let w = line
             .layout_opt()
@@ -219,20 +220,23 @@ pub fn draw_text_clipped(
             let ellipsis = "\u{2026}";
             let ellipsis_w = text_width(font_system, ellipsis, font_size, font_family);
             let target_w = max_w - ellipsis_w;
-            // Binary search for truncation point
+            // Binary search on character indices to avoid splitting multi-byte chars
+            let char_indices: Vec<usize> = text.char_indices().map(|(i, _)| i).collect();
             let mut lo = 0usize;
-            let mut hi = text.len();
+            let mut hi = char_indices.len();
             while lo < hi {
-                let mid = (lo + hi).div_ceil(2);
-                let prefix = &text[..mid];
+                let mid_char = (lo + hi).div_ceil(2);
+                let mid_byte = char_indices.get(mid_char).copied().unwrap_or(text.len());
+                let prefix = &text[..mid_byte];
                 let w = text_width(font_system, prefix, font_size, font_family);
                 if w <= target_w {
-                    lo = mid;
+                    lo = mid_char;
                 } else {
-                    hi = mid - 1;
+                    hi = mid_char - 1;
                 }
             }
-            let mut result = text[..lo].to_string();
+            let byte_end = char_indices.get(lo).copied().unwrap_or(text.len());
+            let mut result = text[..byte_end].to_string();
             result.push('\u{2026}');
             result
         } else {
@@ -246,6 +250,7 @@ pub fn draw_text_clipped(
     let mut buffer = cosmic_text::Buffer::new(font_system, cosmic_text::Metrics::new(font_size, font_size));
     buffer.set_text(font_system, &display_text, attrs, cosmic_text::Shaping::Advanced);
     buffer.set_size(font_system, Some(pixmap.width() as f32), Some(pixmap.height() as f32));
+    buffer.set_wrap(font_system, cosmic_text::Wrap::None);
 
     let text_left = x;
     let text_right = if max_w > 0.0 { x + max_w } else { pixmap.width() as f32 };

@@ -193,6 +193,7 @@ pub fn handle_action(app: &mut OmniApp, action: wisp::input::InputAction, row_he
             app.list_state.ensure_selected_visible(row_height);
         }
         wisp::input::InputAction::AppendChar(ch) => app.insert_char(ch),
+        wisp::input::InputAction::Click { .. } => {}
         wisp::input::InputAction::None => {}
     }
 }
