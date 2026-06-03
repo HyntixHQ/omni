@@ -212,6 +212,11 @@ impl Dispatch<wl_keyboard::WlKeyboard, ()> for Inner {
                 state.repeat_rate = rate;
                 state.repeat_delay = delay;
             }
+            wl_keyboard::Event::Enter { .. } => {
+                state.active_key = None;
+                state.last_key_time = None;
+                state.is_repeating = false;
+            }
             _ => {}
         }
     }
