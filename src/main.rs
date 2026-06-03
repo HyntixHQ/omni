@@ -1,12 +1,15 @@
 use std::io::Write;
 
+use tiny_skia::Color;
 use wisp::draw::{color_from_hex, rgba_to_bgra};
 use wisp::input::InputAction;
+use wisp_components::list_view::ListColors;
 
 use omni_app_launcher::config::Config;
 use omni_app_launcher::draw::draw_launcher_frame;
 use omni_app_launcher::state::{self, OmniApp};
-use omni_calculator::{draw_calculator, CalcState, CALC_HEIGHT, CALC_WIDTH};
+use omni_calculator::{draw_calculator, CalcState};
+use omni_clipboard::{draw_clipboard, ClipboardState};
 use omni_daemon::shortcuts::ShortcutAction;
 use omni_daemon::Daemon;
 use omni_ipc::IpcCommand;
@@ -18,11 +21,12 @@ static GLOBAL: jemallocator::Jemalloc = jemallocator::Jemalloc;
 enum ActiveApp {
     Launcher(Box<OmniApp>),
     Calculator(CalcState),
+    Clipboard(ClipboardState),
 }
 
-fn resize_for_app(daemon: &mut Daemon, app: &ActiveApp, config: &Config) {
+fn resize_for_app(daemon: &mut Daemon, app: &ActiveApp, config: &Config) -> (i32, i32) {
     let (w, h) = match app {
-        ActiveApp::Launcher(_) => {
+        ActiveApp::Launcher(_) | ActiveApp::Clipboard(_) => {
             let row_h = omni_app_launcher::draw::compute_row_height(
                 daemon.font_system_mut(),
                 config.font.size as f32,
@@ -36,13 +40,24 @@ fn resize_for_app(daemon: &mut Daemon, app: &ActiveApp, config: &Config) {
             let total_h = (padding + header_h + gap + body_h + gap + footer_h + padding).round() as i32;
             (config.window.width, total_h)
         }
-        ActiveApp::Calculator(_) => (CALC_WIDTH, CALC_HEIGHT),
+        ActiveApp::Calculator(_) => {
+            let pad = 14.0;
+            let label_h = 22.0;
+            let input_h = 42.0;
+            let gap = 14.0;
+            let result_h = 30.0;
+            let footer_h = 28.0;
+            let bottom_pad = 10.0;
+            let h = (pad + label_h + input_h + gap + result_h + gap + footer_h + bottom_pad) as i32;
+            (config.window.width, h)
+        }
     };
     let (cw, ch) = daemon.surface_size();
     if w != cw || h != ch {
         daemon.resize_surface(w, h);
         daemon.poll();
     }
+    (w, h)
 }
 
 fn draw_frame(daemon: &mut Daemon, active: &mut ActiveApp, config: &Config, cursor_visible: bool) {
@@ -61,7 +76,46 @@ fn draw_frame(daemon: &mut Daemon, active: &mut ActiveApp, config: &Config, curs
                     color_from_hex(&config.theme.fg),
                     color_from_hex(&config.theme.badge_destructive_fg),
                     color_from_hex(&config.theme.desc_fg),
+                    color_from_hex(&config.theme.entry_bg),
+                    color_from_hex(&config.theme.border),
                     &config.font.family, config.theme.border_radius as f32, calc, cursor_visible,
+                );
+            }
+            ActiveApp::Clipboard(clipboard_state) => {
+                let list_colors = ListColors {
+                    bg: color_from_hex(&config.theme.bg),
+                    hover: {
+                        let mut c = color_from_hex(&config.theme.selected_bg);
+                        c = Color::from_rgba8(
+                            (c.red() * 255.0) as u8,
+                            (c.green() * 255.0) as u8,
+                            (c.blue() * 255.0) as u8,
+                            50,
+                        );
+                        c
+                    },
+                    active_bg: color_from_hex(&config.theme.selected_bg),
+                    active_border: color_from_hex(&config.theme.border),
+                    active_highlight: false,
+                    fg: color_from_hex(&config.theme.fg),
+                    selected_fg: color_from_hex(&config.theme.selected_fg),
+                    desc_fg: color_from_hex(&config.theme.desc_fg),
+                    selected_desc_fg: color_from_hex(&config.theme.selected_fg),
+                };
+                draw_clipboard(
+                    &mut surf.pixmap, font, swash,
+                    color_from_hex(&config.theme.bg),
+                    &list_colors,
+                    color_from_hex(&config.theme.entry_bg),
+                    color_from_hex(&config.theme.border),
+                    config.font.size as f32,
+                    color_from_hex(&config.theme.placeholder_fg),
+                    color_from_hex(&config.theme.caret),
+                    &config.font.family,
+                    config.theme.border_radius as f32,
+                    clipboard_state,
+                    cursor_visible,
+                    mouse_y,
                 );
             }
         }
@@ -143,6 +197,12 @@ fn run_daemon(config: Config) {
             keys: keys.clone(),
         });
     }
+    if let Some(keys) = &config.shortcuts.clipboard {
+        shortcuts.push(omni_daemon::sway_backend::ShortcutEntry {
+            id: "clipboard".into(),
+            keys: keys.clone(),
+        });
+    }
     for (app_id, keys) in &config.shortcuts.apps {
         shortcuts.push(omni_daemon::sway_backend::ShortcutEntry {
             id: format!("app:{}", app_id),
@@ -174,6 +234,10 @@ fn run_daemon(config: Config) {
 
     let mut active: Option<ActiveApp> = None;
 
+    std::panic::set_hook(Box::new(|panic_info| {
+        tracing::error!("PANIC: {}", panic_info);
+    }));
+
     while daemon.running() {
         if !daemon.poll() { break; }
 
@@ -181,18 +245,26 @@ fn run_daemon(config: Config) {
             match cmd {
                 IpcCommand::Launcher => {
                     let app = ActiveApp::Launcher(Box::new(OmniApp::new(&config)));
-                    resize_for_app(&mut daemon, &app, &config);
-                    daemon.show_surface(config.window.width, total_h);
+                    let (w, h) = resize_for_app(&mut daemon, &app, &config);
+                    daemon.show_surface(w, h);
                     active = Some(app);
                 }
                 IpcCommand::Calculator(expr) => {
                     let calc = ActiveApp::Calculator(CalcState::new(&expr.unwrap_or_default()));
-                    resize_for_app(&mut daemon, &calc, &config);
-                    daemon.show_surface(CALC_WIDTH, CALC_HEIGHT);
+                    let (w, h) = resize_for_app(&mut daemon, &calc, &config);
+                    daemon.show_surface(w, h);
                     active = Some(calc);
                 }
                 IpcCommand::Quit => {
                     daemon.quit();
+                }
+                IpcCommand::Clipboard => {
+                    let entries = daemon.clipboard_entries();
+                    let clipboard_state = ClipboardState::with_entries(entries);
+                    let app = ActiveApp::Clipboard(clipboard_state);
+                    let (w, h) = resize_for_app(&mut daemon, &app, &config);
+                    daemon.show_surface(w, h);
+                    active = Some(app);
                 }
             }
         }
@@ -201,15 +273,23 @@ fn run_daemon(config: Config) {
             match shortcut {
                 ShortcutAction::ShowLauncher => {
                     let app = ActiveApp::Launcher(Box::new(OmniApp::new(&config)));
-                    resize_for_app(&mut daemon, &app, &config);
-                    daemon.show_surface(config.window.width, total_h);
+                    let (w, h) = resize_for_app(&mut daemon, &app, &config);
+                    daemon.show_surface(w, h);
                     active = Some(app);
                 }
                 ShortcutAction::ShowCalculator => {
                     let calc = ActiveApp::Calculator(CalcState::new(""));
-                    resize_for_app(&mut daemon, &calc, &config);
-                    daemon.show_surface(CALC_WIDTH, CALC_HEIGHT);
+                    let (w, h) = resize_for_app(&mut daemon, &calc, &config);
+                    daemon.show_surface(w, h);
                     active = Some(calc);
+                }
+                ShortcutAction::ShowClipboard => {
+                    let entries = daemon.clipboard_entries();
+                    let clipboard_state = ClipboardState::with_entries(entries);
+                    let app = ActiveApp::Clipboard(clipboard_state);
+                    let (w, h) = resize_for_app(&mut daemon, &app, &config);
+                    daemon.show_surface(w, h);
+                    active = Some(app);
                 }
             }
         }
@@ -333,12 +413,46 @@ fn run_daemon(config: Config) {
                         }
                     }
                 }
+                ActiveApp::Clipboard(clipboard_state) => {
+                    for action in daemon.drain_actions() {
+                        match action {
+                            InputAction::Confirm => {
+                                if let Some(text) = clipboard_state.selected() {
+                                    daemon.clipboard_paste(&text);
+                                }
+                                hide = true;
+                            }
+                            InputAction::Cancel => {
+                                hide = true;
+                            }
+                            InputAction::SelectNext => {
+                                clipboard_state.select_next();
+                                daemon.set_dirty();
+                            }
+                            InputAction::SelectPrev => {
+                                clipboard_state.select_prev();
+                                daemon.set_dirty();
+                            }
+                            InputAction::AppendChar(ch) => {
+                                clipboard_state.append_char(ch);
+                                daemon.set_dirty();
+                                daemon.mark_input();
+                            }
+                            InputAction::Backspace => {
+                                clipboard_state.backspace();
+                                daemon.set_dirty();
+                                daemon.mark_input();
+                            }
+                            _ => {}
+                        }
+                    }
+                }
             }
         }
 
         if let Some(new_app) = switch_to {
-            resize_for_app(&mut daemon, &new_app, &config);
-            daemon.show_surface(CALC_WIDTH, CALC_HEIGHT);
+            let (w, h) = resize_for_app(&mut daemon, &new_app, &config);
+            daemon.show_surface(w, h);
             active = Some(new_app);
         } else if hide {
             daemon.hide_surface();
@@ -369,7 +483,9 @@ fn run_client(args: &[String], config: &Config) {
         }
     };
 
-    let cmd = if args.iter().any(|a| a == "--calculator" || a == "-c") {
+    let cmd = if args.iter().any(|a| a == "--clipboard") {
+        "clipboard\n".to_string()
+    } else if args.iter().any(|a| a == "--calculator" || a == "-c") {
         if args.len() > 2 && !args[2].starts_with('-') {
             format!("calculator:{}\n", args[2])
         } else {
@@ -393,6 +509,10 @@ fn handle_shortcut(id: &str, config: &Config) {
         "calculator" => {
             let mut socket = ipc_connect();
             let _ = socket.write_all(b"calculator\n");
+        }
+        "clipboard" => {
+            let mut socket = ipc_connect();
+            let _ = socket.write_all(b"clipboard\n");
         }
         app_id => {
             let clean_id = app_id.strip_prefix("app:").unwrap_or(app_id);

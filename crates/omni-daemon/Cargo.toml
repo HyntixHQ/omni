@@ -14,8 +14,9 @@ workspace = true
 [dependencies]
 wisp = { path = "../wisp" }
 omni-ipc = { path = "../omni-ipc" }
+omni-clipboard = { path = "../omni-clipboard" }
 wayland-client.workspace = true
-wayland-protocols.workspace = true
+wayland-protocols = { workspace = true, features = ["staging"] }
 wayland-protocols-wlr = { workspace = true, features = ["client"] }
 cosmic-text.workspace = true
 tiny-skia.workspace = true

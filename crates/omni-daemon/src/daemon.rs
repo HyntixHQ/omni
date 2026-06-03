@@ -11,7 +11,7 @@ use wayland_client::protocol::{
     wl_surface,
 };
 use wayland_backend::client::WaylandError;
-use wayland_client::{delegate_noop, Connection, Dispatch, EventQueue, QueueHandle, WEnum};
+use wayland_client::{delegate_noop, event_created_child, Connection, Dispatch, EventQueue, QueueHandle, WEnum};
 use wayland_protocols_wlr::layer_shell::v1::client::zwlr_layer_shell_v1::{
     self, ZwlrLayerShellV1,
 };
@@ -24,6 +24,13 @@ use wisp::surface::WispSurface;
 use wisp::{CursorBlink, CursorManager};
 
 use omni_ipc::IpcCommand;
+
+use wayland_protocols::ext::data_control::v1::client::{
+    ext_data_control_device_v1::{self, ExtDataControlDeviceV1},
+    ext_data_control_manager_v1::ExtDataControlManagerV1,
+    ext_data_control_offer_v1::ExtDataControlOfferV1,
+    ext_data_control_source_v1::{self, ExtDataControlSourceV1},
+};
 
 use crate::shortcuts::{HyprlandGlobalShortcutsManagerV1, ShortcutAction, ShortcutManager};
 
@@ -94,6 +101,15 @@ pub struct Inner {
     pub surface_visible: bool,
     pub pending_shortcut: Option<ShortcutAction>,
     pub shortcut_manager: ShortcutManager,
+    // Clipboard monitoring
+    pub data_manager: Option<ExtDataControlManagerV1>,
+    pub data_device: Option<ExtDataControlDeviceV1>,
+    pub pending_offer: Option<ExtDataControlOfferV1>,
+    pub pending_read_offer: Option<ExtDataControlOfferV1>,
+    pub skipping_next_read: bool,
+    pub clipboard: Option<omni_clipboard::ClipboardState>,
+    pub pending_paste_text: Option<String>,
+    pub pending_source: Option<ExtDataControlSourceV1>,
 }
 
 delegate_noop!(Inner: ignore wl_compositor::WlCompositor);
@@ -103,6 +119,7 @@ delegate_noop!(Inner: ignore wl_shm_pool::WlShmPool);
 delegate_noop!(Inner: ignore wl_buffer::WlBuffer);
 delegate_noop!(Inner: ignore ZwlrLayerShellV1);
 delegate_noop!(Inner: ignore HyprlandGlobalShortcutsManagerV1);
+delegate_noop!(Inner: ignore ExtDataControlManagerV1);
 
 impl Dispatch<wl_registry::WlRegistry, ()> for Inner {
     fn event(
@@ -136,6 +153,10 @@ impl Dispatch<wl_registry::WlRegistry, ()> for Inner {
                 "hyprland_global_shortcuts_manager_v1" => {
                     let mgr = registry.bind::<HyprlandGlobalShortcutsManagerV1, _, _>(name, 1, qh, ());
                     state.shortcut_manager.init(&mgr, qh);
+                }
+                "ext_data_control_manager_v1" => {
+                    let mgr = registry.bind::<ExtDataControlManagerV1, _, _>(name, 1, qh, ());
+                    state.data_manager = Some(mgr.clone());
                 }
                 _ => {}
             }
@@ -213,6 +234,11 @@ impl Dispatch<wl_seat::WlSeat, ()> for Inner {
                 let ptr = seat.get_pointer(qh, ());
                 state.pointer = Some(ptr);
             }
+            // Create data device once we have a seat
+            if let Some(ref mgr) = state.data_manager {
+                let device = mgr.get_data_device(seat, qh, ());
+                state.data_device = Some(device);
+            }
         }
     }
 }
@@ -227,8 +253,8 @@ impl Dispatch<wl_pointer::WlPointer, ()> for Inner {
         _qh: &QueueHandle<Self>,
     ) {
         match event {
-            wl_pointer::Event::Enter { serial, surface_y, .. } => {
-                state.input.mouse_enter(surface_y as f32);
+            wl_pointer::Event::Enter { serial, surface_x, surface_y, .. } => {
+                state.input.mouse_enter(surface_x as f32, surface_y as f32);
                 if let Some(cursor) = state.cursor.as_mut() {
                     cursor.set_serial(serial);
                     if let Some(pointer) = state.pointer.as_ref() {
@@ -241,8 +267,8 @@ impl Dispatch<wl_pointer::WlPointer, ()> for Inner {
                 state.input.mouse_exit();
                 state.dirty = true;
             }
-            wl_pointer::Event::Motion { surface_y, .. } => {
-                state.input.mouse_move(surface_y as f32);
+            wl_pointer::Event::Motion { surface_x, surface_y, .. } => {
+                state.input.mouse_move(surface_x as f32, surface_y as f32);
                 state.dirty = true;
             }
             wl_pointer::Event::Button { button, state: btn_state, serial, .. } => {
@@ -309,7 +335,88 @@ impl Dispatch<ZwlrLayerSurfaceV1, ()> for Inner {
                 state.dirty = true;
             }
             zwlr_layer_surface_v1::Event::Closed => {
+                tracing::warn!("layer surface closed by compositor");
                 state.running = false;
+            }
+            _ => {}
+        }
+    }
+}
+
+impl Dispatch<ExtDataControlDeviceV1, ()> for Inner {
+    fn event(
+        state: &mut Self,
+        _proxy: &ExtDataControlDeviceV1,
+        event: <ExtDataControlDeviceV1 as wayland_client::Proxy>::Event,
+        _data: &(),
+        _conn: &wayland_client::Connection,
+        _qh: &QueueHandle<Self>,
+    ) {
+        match event {
+            ext_data_control_device_v1::Event::DataOffer { id } => {
+                state.pending_offer = Some(id);
+            }
+            ext_data_control_device_v1::Event::Selection { id } => {
+                if state.skipping_next_read {
+                    state.skipping_next_read = false;
+                    tracing::info!("data_control: skipping Selection (own selection)");
+                } else {
+                    state.pending_read_offer = id;
+                }
+                state.pending_offer = None;
+            }
+            ext_data_control_device_v1::Event::Finished => {
+                state.data_device = None;
+            }
+            _ => {}
+        }
+    }
+
+    event_created_child!(Inner, ExtDataControlDeviceV1, [
+        0 => (ExtDataControlOfferV1, ()),
+    ]);
+}
+
+impl Dispatch<ExtDataControlOfferV1, ()> for Inner {
+    fn event(
+        _state: &mut Self,
+        _proxy: &ExtDataControlOfferV1,
+        _event: <ExtDataControlOfferV1 as wayland_client::Proxy>::Event,
+        _data: &(),
+        _conn: &wayland_client::Connection,
+        _qh: &QueueHandle<Self>,
+    ) {
+    }
+}
+
+impl Dispatch<ExtDataControlSourceV1, ()> for Inner {
+    fn event(
+        state: &mut Self,
+        proxy: &ExtDataControlSourceV1,
+        event: <ExtDataControlSourceV1 as wayland_client::Proxy>::Event,
+        _data: &(),
+        _conn: &wayland_client::Connection,
+        _qh: &QueueHandle<Self>,
+    ) {
+        let is_current_source = state.pending_source.as_ref().is_some_and(|s| s == proxy);
+        match event {
+            ext_data_control_source_v1::Event::Send { mime_type, fd } => {
+                if is_current_source {
+                    if let Some(ref pending) = state.pending_paste_text {
+                        if mime_type == "text/plain" || mime_type == "text/plain;charset=utf-8" {
+                            use std::io::Write;
+                            let mut file = std::fs::File::from(fd);
+                            let _ = file.write_all(pending.as_bytes());
+                            let _ = file.write_all(b"\n");
+                        }
+                    }
+                }
+            }
+            ext_data_control_source_v1::Event::Cancelled => {
+                if is_current_source {
+                    state.pending_paste_text = None;
+                    state.pending_source = None;
+                }
             }
             _ => {}
         }
@@ -363,6 +470,14 @@ impl Daemon {
             surface_visible: false,
             pending_shortcut: None,
             shortcut_manager: ShortcutManager::new(),
+            data_manager: None,
+            data_device: None,
+            pending_offer: None,
+            pending_read_offer: None,
+            skipping_next_read: false,
+            clipboard: None,
+            pending_paste_text: None,
+            pending_source: None,
         };
 
         Daemon { conn, event_queue, inner: Box::new(inner), font_system, swash_cache }
@@ -439,6 +554,9 @@ impl Daemon {
     pub fn hide_surface(&mut self) {
         if let Some(surf) = self.inner.surface.as_mut() {
             surf.wl_surface.attach(None::<&wl_buffer::WlBuffer>, 0, 0);
+            // Reset anchor and margin so the next show_surface defaults to centered
+            surf.set_anchor(zwlr_layer_surface_v1::Anchor::empty());
+            surf.set_margin(0, 0, 0, 0);
             surf.wl_surface.commit();
         }
         self.inner.surface_visible = false;
@@ -450,6 +568,9 @@ impl Daemon {
             let surf = self.inner.surface.as_mut();
             if let Some(surf) = surf {
                 surf.set_size(width as u32, height as u32);
+                surf.set_keyboard_interactivity(
+                    zwlr_layer_surface_v1::KeyboardInteractivity::Exclusive,
+                );
                 surf.wl_surface.commit();
             }
         }
@@ -465,6 +586,10 @@ impl Daemon {
 
     pub fn mouse_y(&self) -> f32 {
         self.inner.input.mouse_y()
+    }
+
+    pub fn mouse_x(&self) -> f32 {
+        self.inner.input.mouse_x()
     }
 
     pub fn mouse_inside(&self) -> bool {
@@ -502,6 +627,112 @@ impl Daemon {
         self.inner.cursor_blink.mark_activity();
     }
 
+    /// Read clipboard text from a data offer (deferred path: non-blocking, 200ms timeout).
+    /// Called from `poll()` after dispatch so we never block inside an event handler.
+    pub fn read_clipboard_text(&mut self, offer: ExtDataControlOfferV1) {
+        let text = self.try_read_clipboard_offer(offer);
+        if let Some(text) = text {
+            if !text.is_empty() {
+                let state = self.inner.clipboard.get_or_insert_with(|| omni_clipboard::ClipboardState::new());
+                state.push(text);
+            }
+        }
+    }
+
+    /// Inner dispatcher-compatible variant: takes &Connection so it can be called from
+    /// a `Dispatch` impl without borrowing the `EventQueue` from `&mut self`.
+    pub fn inner_read_clipboard(conn: &Connection, inner: &mut Inner, offer: ExtDataControlOfferV1) {
+        let mut fds: [RawFd; 2] = [-1, -1];
+        if unsafe { libc::pipe(fds.as_mut_ptr()) } != 0 {
+            return;
+        }
+        let r = fds[0];
+        let w = fds[1];
+        let owned_w = unsafe { OwnedFd::from_raw_fd(w) };
+        offer.receive("text/plain".to_string(), owned_w.as_fd());
+        let _ = conn.flush();
+        // Poll with 200ms timeout instead of blocking read_to_string.
+        let mut pfd = libc::pollfd { fd: r, events: libc::POLLIN, revents: 0 };
+        let ret = unsafe { libc::poll(&mut pfd, 1, 200) };
+        drop(offer);
+        if ret > 0 && pfd.revents & libc::POLLIN != 0 {
+            use std::io::Read;
+            let mut text = String::new();
+            if std::io::BufReader::new(unsafe { std::fs::File::from_raw_fd(r) }).read_to_string(&mut text).is_ok()
+                && !text.is_empty()
+            {
+                let state = inner.clipboard.get_or_insert_with(|| omni_clipboard::ClipboardState::new());
+                state.push(text);
+            }
+        } else {
+            unsafe { libc::close(r); }
+        }
+    }
+
+    /// Non-blocking read of a clipboard offer. Returns the text if available within 200ms.
+    fn try_read_clipboard_offer(&mut self, offer: ExtDataControlOfferV1) -> Option<String> {
+        let mut fds: [RawFd; 2] = [-1, -1];
+        if unsafe { libc::pipe(fds.as_mut_ptr()) } != 0 {
+            return None;
+        }
+        let r = fds[0];
+        let w = fds[1];
+        let owned_w = unsafe { OwnedFd::from_raw_fd(w) };
+        offer.receive("text/plain".to_string(), owned_w.as_fd());
+        let _ = self.conn.flush();
+        drop(owned_w);
+        let mut pfd = libc::pollfd { fd: r, events: libc::POLLIN, revents: 0 };
+        let ret = unsafe { libc::poll(&mut pfd, 1, 200) };
+        if ret > 0 && pfd.revents & libc::POLLIN != 0 {
+            use std::io::Read;
+            let mut text = String::new();
+            let _ = std::io::BufReader::new(unsafe { std::fs::File::from_raw_fd(r) }).read_to_string(&mut text);
+            Some(text)
+        } else {
+            unsafe { libc::close(r); }
+            None
+        }
+    }
+
+    /// Try to read a pending offer stored by the Selection dispatch handler.
+    /// Returns the text if available; None if no pending offer or no data within 200ms.
+    pub fn try_pending_clipboard_read(&mut self) -> Option<String> {
+        let offer = self.inner.pending_read_offer.take()?;
+        self.try_read_clipboard_offer(offer)
+    }
+
+    /// Set clipboard selection and prepare for paste.
+    pub fn set_clipboard_selection(&mut self, text: &str) {
+        let mgr = match self.inner.data_manager.as_ref() {
+            Some(m) => m,
+            None => return,
+        };
+        let qh = self.event_queue.handle();
+        let source = mgr.create_data_source(&qh, ());
+        source.offer("text/plain".to_string());
+        source.offer("text/plain;charset=utf-8".to_string());
+        self.inner.pending_paste_text = Some(text.to_string());
+        self.inner.pending_source = Some(source.clone());
+        if let Some(ref device) = self.inner.data_device {
+            device.set_selection(Some(&source));
+        }
+        self.inner.skipping_next_read = true;
+        let _ = self.conn.flush();
+    }
+
+    /// Get a handle to the clipboard state for use in main loop.
+    pub fn clipboard_entries(&self) -> Vec<omni_clipboard::ClipboardEntry> {
+        self.inner.clipboard.as_ref().map_or_else(Vec::new, |c| c.entries.clone())
+    }
+
+    /// Set clipboard selection and hide the surface.
+    /// The user pastes manually with Ctrl+V.
+    pub fn clipboard_paste(&mut self, text: &str) {
+        tracing::info!("clipboard_paste: setting {} bytes", text.len());
+        self.set_clipboard_selection(text);
+        self.hide_surface();
+    }
+
     pub fn poll(&mut self) -> bool {
         let _ = self.conn.flush();
 
@@ -534,6 +765,7 @@ impl Daemon {
         if let Err(WaylandError::Io(_)) = self.conn.flush() {
             // The compositor likely disconnected. Try to dispatch any events that may
             // already be in the buffer (e.g. a protocol error from a previous read).
+            tracing::error!("poll: flush before prepare failed with EPIPE");
             match self.event_queue.dispatch_pending(&mut *self.inner) {
                 Err(wayland_client::DispatchError::Backend(WaylandError::Protocol(err))) => {
                     tracing::error!(
@@ -619,6 +851,18 @@ impl Daemon {
             }
             self.inner.running = false;
             return false;
+        }
+
+        // Drain any pending clipboard read OUTSIDE the dispatch context so it can
+        // never block inside an event handler. The non-blocking poll inside caps
+        // each read at 200ms.
+        if self.inner.pending_read_offer.is_some() {
+            if let Some(text) = self.try_pending_clipboard_read() {
+                if !text.is_empty() {
+                    let state = self.inner.clipboard.get_or_insert_with(|| omni_clipboard::ClipboardState::new());
+                    state.push(text);
+                }
+            }
         }
 
         // Accept new IPC connections
@@ -715,6 +959,7 @@ impl Daemon {
     }
 
     pub fn quit(&mut self) {
+        tracing::info!("quit requested via IPC");
         self.inner.running = false;
     }
 

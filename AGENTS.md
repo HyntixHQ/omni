@@ -87,3 +87,25 @@ All draw positions must be `.round()` to integer pixels. Tiny-Skia and cosmic-te
 ## Config
 
 Path: `~/.config/omni/config.toml` or `/etc/omni/config.toml`. Theme fields use `#rrggbb` hex. Font family/size auto-detected from GTK.
+
+All `ShortcutsConfig` fields (`launcher`, `calculator`, `clipboard`, `apps`) must have `#[serde(default)]` so existing configs without the `clipboard` key don't silently fail to parse.
+
+## Clipboard caveats
+
+- `inner_read_clipboard` must flush the Wayland connection after `offer.receive()` and before reading the pipe — otherwise the compositor never receives the `receive` request and the blocking `read_to_string` hangs forever (daemon appears to restart after ~45s due to compositor disconnect).
+- `Dispatch<ZwlrDataControlDeviceV1>` must implement `event_created_child` for opcode 0 (`DataOffer`), which creates a `ZwlrDataControlOfferV1`. Without it, wayland-client panics on the first `DataOffer` event.
+
+## Ctrl+V paste via virtual keyboard (not working)
+
+`send_ctrl_v` in `daemon.rs` uses `zwp_virtual_keyboard_v1` to inject Ctrl+V after setting clipboard selection. Despite matching wtype's approach exactly:
+
+1. Upload keymap ONCE (not per-paste) + roundtrip
+2. Set Ctrl modifier state via `modifiers()` — NO key event for Ctrl key
+3. Roundtrip after each event (not batched flush)
+4. 2ms sleep between press/release
+
+...the paste still fails. Likely causes to investigate:
+
+- `roundtrip` inside `send_ctrl_v` hangs — the daemon logs `key injection scheduled` but never logs `clipboard_paste: done`. The roundtrip may deadlock if an event dispatched during the flush triggers `inner_read_clipboard` (which blocks on pipe read).
+- wlroots data-control v1 skips sending `Selection` to the device that *set* the selection, but other events (e.g., `DataOffer`) may still arrive during the roundtrip.
+- Alternative: drop virtual keyboard entirely; just set clipboard selection and let the user paste manually with Ctrl+V.

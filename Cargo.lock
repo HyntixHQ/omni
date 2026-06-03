@@ -562,6 +562,7 @@ dependencies = [
  "memmap2",
  "omni-app-launcher",
  "omni-calculator",
+ "omni-clipboard",
  "omni-core",
  "omni-daemon",
  "omni-ipc",
@@ -611,6 +612,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "omni-clipboard"
+version = "0.1.0"
+dependencies = [
+ "cosmic-text",
+ "tiny-skia",
+ "wisp",
+ "wisp-components",
+]
+
+[[package]]
 name = "omni-core"
 version = "0.1.0"
 dependencies = [
@@ -627,6 +638,7 @@ dependencies = [
  "cosmic-text",
  "libc",
  "memmap2",
+ "omni-clipboard",
  "omni-ipc",
  "tiny-skia",
  "tracing",

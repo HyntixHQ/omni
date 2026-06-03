@@ -19,6 +19,7 @@ pub use hyprland_global_shortcuts_manager_v1::HyprlandGlobalShortcutsManagerV1;
 pub enum ShortcutAction {
     ShowLauncher,
     ShowCalculator,
+    ShowClipboard,
 }
 
 pub struct ShortcutManager {
@@ -53,6 +54,15 @@ impl ShortcutManager {
             "Super+Alt+C".to_string(),
             qh,
             ShortcutAction::ShowCalculator,
+        );
+
+        mgr.register_shortcut(
+            "omni:clipboard".to_string(),
+            "omni".to_string(),
+            "Open clipboard manager".to_string(),
+            "Super+V".to_string(),
+            qh,
+            ShortcutAction::ShowClipboard,
         );
     }
 }

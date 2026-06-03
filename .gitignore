@@ -28,3 +28,4 @@ debug_icon.rs
 .opencode/
 docs/
 omni-launcher-prd.md
+test_crash.py

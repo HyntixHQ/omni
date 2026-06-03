@@ -8,6 +8,7 @@ members = [
     "crates/omni-app-launcher",
     "crates/omni-daemon",
     "crates/omni-calculator",
+    "crates/omni-clipboard",
     "crates/omni-ipc",
 ]
 
@@ -43,6 +44,7 @@ omni-app-launcher = { path = "crates/omni-app-launcher" }
 omni-daemon = { path = "crates/omni-daemon" }
 omni-ipc = { path = "crates/omni-ipc" }
 omni-calculator = { path = "crates/omni-calculator" }
+omni-clipboard = { path = "crates/omni-clipboard" }
 omni-search = { path = "crates/omni-search" }
 
 [workspace.package]

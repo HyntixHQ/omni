@@ -95,6 +95,13 @@ pub fn row_height(font_system: &mut cosmic_text::FontSystem, font_size: f32, fon
     n_ascent + n_descent + d_ascent + d_descent + 2.0 + 12.0
 }
 
+/// Compute compact row height for items without subtitle.
+pub fn row_height_compact(font_system: &mut cosmic_text::FontSystem, font_size: f32, font_family: &str) -> f32 {
+    let (n_ascent, n_descent) = draw::text_metrics(font_system, "Ag", font_size, font_family);
+    let name_h = n_ascent + n_descent;
+    name_h + 12.0
+}
+
 /// Draw a list — matches shadcn CommandItem / GPUI-component List spec.
 /// Takes `mouse_y` for hover tracking (pass -1 to disable hover).
 pub fn draw_list(
@@ -172,6 +179,9 @@ pub fn draw_list(
 
         let name_color = if item.selected { colors.selected_fg } else { colors.fg };
 
+        let has_prefix = item.prefix_icon.is_some();
+        let has_suffix = item.suffix_icon.is_some();
+
         // Icon
         let icon_y = row_y + ((row_h - 4.0 - icon_size) / 2.0).round();
         let icon_x = x + padding_x;
@@ -180,8 +190,8 @@ pub fn draw_list(
             draw::draw_pixmap_clipped(pixmap, icon, icon_x, icon_y, y, y + h);
         }
 
-        let text_x = x + padding_x + icon_size + gap;
-        let max_text_w = w - (text_x - x) - padding_x;
+        let text_x = if has_prefix { x + padding_x + icon_size + gap } else { x + padding_x };
+        let max_text_w = if has_suffix { w - (text_x - x) - padding_x - icon_size - gap } else { w - (text_x - x) - padding_x };
         let text_y = (row_y + (row_h - 4.0 - row_content_h) / 2.0).round();
 
         // Title

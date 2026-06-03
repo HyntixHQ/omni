@@ -61,6 +61,7 @@ pub struct WispInput {
     scroll_axis: f32,
     scroll_discrete: i32,
     // Mouse state (GPUI: MouseMoveEvent, MouseExitEvent)
+    mouse_x: f32,
     mouse_y: f32,
     mouse_inside: bool,
     mouse_pressed_button: Option<MouseButton>,
@@ -79,6 +80,7 @@ impl WispInput {
             repeat_rate: 25,
             scroll_axis: 0.0,
             scroll_discrete: 0,
+            mouse_x: 0.0,
             mouse_y: 0.0,
             mouse_inside: false,
             mouse_pressed_button: None,
@@ -199,6 +201,10 @@ impl WispInput {
 
     // ── Mouse state (GPUI-aligned) ─────────────────────
 
+    pub fn mouse_x(&self) -> f32 {
+        self.mouse_x
+    }
+
     pub fn mouse_y(&self) -> f32 {
         self.mouse_y
     }
@@ -212,13 +218,15 @@ impl WispInput {
     }
 
     /// Called on wl_pointer::Enter (GPUI: inferred from MouseMoveEvent).
-    pub fn mouse_enter(&mut self, y: f32) {
+    pub fn mouse_enter(&mut self, x: f32, y: f32) {
         self.mouse_inside = true;
+        self.mouse_x = x;
         self.mouse_y = y;
     }
 
     /// Called on wl_pointer::Motion (GPUI: MouseMoveEvent).
-    pub fn mouse_move(&mut self, y: f32) {
+    pub fn mouse_move(&mut self, x: f32, y: f32) {
+        self.mouse_x = x;
         self.mouse_y = y;
     }
 

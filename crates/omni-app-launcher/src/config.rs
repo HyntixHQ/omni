@@ -58,8 +58,12 @@ pub struct IconConfig {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ShortcutsConfig {
+    #[serde(default)]
     pub launcher: Option<String>,
+    #[serde(default)]
     pub calculator: Option<String>,
+    #[serde(default)]
+    pub clipboard: Option<String>,
     #[serde(default)]
     pub apps: HashMap<String, String>,
 }
@@ -69,6 +73,7 @@ impl Default for ShortcutsConfig {
         Self {
             launcher: Some("Super+Space".into()),
             calculator: Some("Super+Alt+C".into()),
+            clipboard: Some("Super+V".into()),
             apps: HashMap::new(),
         }
     }

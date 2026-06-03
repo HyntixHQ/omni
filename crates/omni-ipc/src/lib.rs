@@ -5,6 +5,7 @@ use std::os::unix::net::{UnixListener, UnixStream};
 pub enum IpcCommand {
     Launcher,
     Calculator(Option<String>),
+    Clipboard,
     Quit,
 }
 
@@ -14,6 +15,7 @@ impl IpcCommand {
         match line {
             "launcher" => Some(IpcCommand::Launcher),
             "calculator" => Some(IpcCommand::Calculator(None)),
+            "clipboard" => Some(IpcCommand::Clipboard),
             "quit" => Some(IpcCommand::Quit),
             _ if line.starts_with("calculator:") => {
                 Some(IpcCommand::Calculator(Some(line["calculator:".len()..].to_string())))
@@ -27,6 +29,7 @@ impl IpcCommand {
             IpcCommand::Launcher => "launcher\n".to_string(),
             IpcCommand::Calculator(None) => "calculator\n".to_string(),
             IpcCommand::Calculator(Some(expr)) => format!("calculator:{}\n", expr),
+            IpcCommand::Clipboard => "clipboard\n".to_string(),
             IpcCommand::Quit => "quit\n".to_string(),
         }
     }
