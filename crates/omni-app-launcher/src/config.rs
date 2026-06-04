@@ -13,6 +13,14 @@ pub struct Config {
     pub shortcuts: ShortcutsConfig,
     #[serde(default)]
     pub wm: WmConfig,
+    #[serde(default)]
+    pub system: SystemConfig,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct SystemConfig {
+    #[serde(default)]
+    pub custom: Vec<omni_system::commands::SystemEntry>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
@@ -75,6 +83,8 @@ pub struct ShortcutsConfig {
     #[serde(default)]
     pub wm: Option<String>,
     #[serde(default)]
+    pub system: Option<String>,
+    #[serde(default)]
     pub apps: HashMap<String, String>,
 }
 
@@ -85,6 +95,7 @@ impl Default for ShortcutsConfig {
             calculator: Some("Super+Alt+C".into()),
             clipboard: Some("Super+V".into()),
             wm: Some("Super+Alt+W".into()),
+            system: Some("Super+Alt+X".into()),
             apps: HashMap::new(),
         }
     }
@@ -169,7 +180,7 @@ impl Config {
     }
 
     fn apply_overrides(&mut self, overrides: Config) {
-        let Config { window, theme, font, icons, shortcuts, wm } = overrides;
+        let Config { window, theme, font, icons, shortcuts, wm, system } = overrides;
         if window.width != WindowConfig::default().width { self.window.width = window.width; }
         self.window.height = window.height;
         self.window.margin = window.margin;
@@ -182,6 +193,7 @@ impl Config {
         self.icons.size = icons.size;
         self.shortcuts = shortcuts;
         self.wm = wm;
+        self.system = system;
     }
 }
 

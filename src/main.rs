@@ -13,6 +13,7 @@ use omni_clipboard::{draw_clipboard, ClipboardState};
 use omni_daemon::shortcuts::ShortcutAction;
 use omni_daemon::Daemon;
 use omni_ipc::IpcCommand;
+use omni_system::{draw_system, handle_action as system_handle_action, SystemState};
 use omni_wm::{detect_compositor, draw_wm, handle_action as wm_handle_action, WmState};
 
 #[cfg(not(target_env = "msvc"))]
@@ -24,6 +25,7 @@ enum ActiveApp {
     Calculator(CalcState),
     Clipboard(ClipboardState),
     Wm(WmState),
+    System(SystemState),
 }
 
 fn resize_for_app(daemon: &mut Daemon, app: &ActiveApp, config: &Config) -> (i32, i32) {
@@ -55,6 +57,20 @@ fn resize_for_app(daemon: &mut Daemon, app: &ActiveApp, config: &Config) -> (i32
         }
         ActiveApp::Wm(_) => {
             let row_h = omni_wm::state::compute_row_height(
+                daemon.font_system_mut(),
+                config.font.size as f32,
+                &config.font.family,
+            );
+            let padding = 10.0f32;
+            let header_h = 42.0f32;
+            let footer_h = 28.0f32;
+            let gap = 8.0f32;
+            let body_h = (8.0 * row_h).round();
+            let total_h = (padding + header_h + gap + body_h + gap + footer_h + padding).round() as i32;
+            (config.window.width, total_h)
+        }
+        ActiveApp::System(_) => {
+            let row_h = omni_system::compute_row_height(
                 daemon.font_system_mut(),
                 config.font.size as f32,
                 &config.font.family,
@@ -154,6 +170,27 @@ fn draw_frame(daemon: &mut Daemon, active: &mut ActiveApp, config: &Config, curs
                     mouse_y,
                 );
             }
+            ActiveApp::System(sys_state) => {
+                draw_system(
+                    &mut surf.pixmap, font, swash,
+                    color_from_hex(&config.theme.bg),
+                    color_from_hex(&config.theme.fg),
+                    color_from_hex(&config.theme.selected_bg),
+                    color_from_hex(&config.theme.placeholder_fg),
+                    color_from_hex(&config.theme.desc_fg),
+                    color_from_hex(&config.theme.caret),
+                    color_from_hex(&config.theme.border),
+                    color_from_hex(&config.theme.placeholder_fg),
+                    color_from_hex(&config.theme.caret),
+                    color_from_hex(&config.theme.badge_destructive_fg),
+                    config.font.size as f32,
+                    &config.font.family,
+                    config.theme.border_radius as f32,
+                    sys_state,
+                    cursor_visible,
+                    mouse_y,
+                );
+            }
         }
         if let Some(mmap) = surf.mmap.as_mut() {
             rgba_to_bgra(surf.pixmap.data(), unsafe {
@@ -245,6 +282,12 @@ fn run_daemon(config: Config) {
             keys: keys.clone(),
         });
     }
+    if let Some(keys) = &config.shortcuts.system {
+        shortcuts.push(omni_daemon::sway_backend::ShortcutEntry {
+            id: "system".into(),
+            keys: keys.clone(),
+        });
+    }
     for (app_id, keys) in &config.shortcuts.apps {
         shortcuts.push(omni_daemon::sway_backend::ShortcutEntry {
             id: format!("app:{}", app_id),
@@ -316,6 +359,17 @@ fn run_daemon(config: Config) {
                     daemon.show_surface(w, h);
                     active = Some(app);
                 }
+                IpcCommand::System => {
+                    let mut sys_state = SystemState::new();
+                    for custom in &config.system.custom {
+                        sys_state.all_entries.push(custom.clone());
+                    }
+                    sys_state.entries = sys_state.all_entries.clone();
+                    let app = ActiveApp::System(sys_state);
+                    let (w, h) = resize_for_app(&mut daemon, &app, &config);
+                    daemon.show_surface(w, h);
+                    active = Some(app);
+                }
             }
         }
 
@@ -345,6 +399,17 @@ fn run_daemon(config: Config) {
                     let compositor = detect_compositor();
                     let wm_state = WmState::new(compositor, &config.wm.custom);
                     let app = ActiveApp::Wm(wm_state);
+                    let (w, h) = resize_for_app(&mut daemon, &app, &config);
+                    daemon.show_surface(w, h);
+                    active = Some(app);
+                }
+                ShortcutAction::ShowSystem => {
+                    let mut sys_state = SystemState::new();
+                    for custom in &config.system.custom {
+                        sys_state.all_entries.push(custom.clone());
+                    }
+                    sys_state.entries = sys_state.all_entries.clone();
+                    let app = ActiveApp::System(sys_state);
                     let (w, h) = resize_for_app(&mut daemon, &app, &config);
                     daemon.show_surface(w, h);
                     active = Some(app);
@@ -603,6 +668,68 @@ fn run_daemon(config: Config) {
                         daemon.mark_input();
                     }
                 }
+                ActiveApp::System(sys_state) => {
+                    let pointer = daemon.pointer().cloned();
+                    let cursor = if daemon.mouse_inside() {
+                        sys_state.mouse.cursor_at(daemon.mouse_y())
+                    } else {
+                        wisp::CursorStyle::Arrow
+                    };
+                    if let Some(ref p) = pointer {
+                        daemon.cursor().set_cursor(p, cursor);
+                    }
+
+                    let row_height = omni_system::compute_row_height(
+                        daemon.font_system_mut(),
+                        config.font.size as f32,
+                        &config.font.family,
+                    );
+                    let delta = daemon.drain_scroll(row_height);
+                    if delta != 0.0
+                        && sys_state.mouse.region_at(daemon.mouse_y(), daemon.mouse_y()) == Some(wisp::events::RegionId::Body)
+                    {
+                        sys_state.list_state.scroll.scroll_by(-delta);
+                        daemon.set_dirty();
+                    }
+
+                    for action in daemon.drain_actions() {
+                        let body_h = sys_state.mouse.body_bounds().map_or(0.0, |(_, h)| h);
+                        match action {
+                            InputAction::Confirm => {
+                                sys_state.execute_selected();
+                                hide = true;
+                            }
+                            InputAction::Cancel => {
+                                hide = true;
+                            }
+                            InputAction::Click { x: _, y } => {
+                                if let Some((body_y, _)) = sys_state.mouse.body_bounds() {
+                                    let rel_y = y as f32 - body_y;
+                                    if let Some(idx) = sys_state.list_state.index_at(rel_y, row_height) {
+                                        let items = sys_state.filtered();
+                                        if idx < items.len() {
+                                            sys_state.list_state.selected_index = idx;
+                                            items[idx].execute();
+                                        }
+                                    }
+                                    hide = true;
+                                }
+                            }
+                            _ => {
+                                system_handle_action(sys_state, action, row_height, body_h);
+                                daemon.set_dirty();
+                                daemon.mark_input();
+                            }
+                        }
+                    }
+
+                    if let Some(action) = daemon.process_repeat() {
+                        let body_h = sys_state.mouse.body_bounds().map_or(0.0, |(_, h)| h);
+                        system_handle_action(sys_state, action, row_height, body_h);
+                        daemon.set_dirty();
+                        daemon.mark_input();
+                    }
+                }
             }
         }
 
@@ -643,6 +770,8 @@ fn run_client(args: &[String], config: &Config) {
         "clipboard\n".to_string()
     } else if args.iter().any(|a| a == "--wm" || a == "-w") {
         "wm\n".to_string()
+    } else if args.iter().any(|a| a == "--system" || a == "-s") {
+        "system\n".to_string()
     } else if args.iter().any(|a| a == "--calculator" || a == "-c") {
         if args.len() > 2 && !args[2].starts_with('-') {
             format!("calculator:{}\n", args[2])
@@ -675,6 +804,10 @@ fn handle_shortcut(id: &str, config: &Config) {
         "wm" => {
             let mut socket = ipc_connect();
             let _ = socket.write_all(b"wm\n");
+        }
+        "system" => {
+            let mut socket = ipc_connect();
+            let _ = socket.write_all(b"system\n");
         }
         app_id => {
             let clean_id = app_id.strip_prefix("app:").unwrap_or(app_id);
