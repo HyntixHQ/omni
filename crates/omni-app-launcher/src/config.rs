@@ -89,6 +89,8 @@ pub struct ShortcutsConfig {
     #[serde(default)]
     pub snippets: Option<String>,
     #[serde(default)]
+    pub help: Option<String>,
+    #[serde(default)]
     pub apps: HashMap<String, String>,
 }
 
@@ -101,6 +103,7 @@ impl Default for ShortcutsConfig {
             wm: Some("Super+Alt+W".into()),
             system: Some("Super+Alt+X".into()),
             snippets: Some("Super+Alt+S".into()),
+            help: Some("F1".into()),
             apps: HashMap::new(),
         }
     }

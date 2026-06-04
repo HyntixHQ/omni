@@ -48,3 +48,15 @@ pub fn kbd(
 
     (bw, bh)
 }
+
+/// Measure a kbd chip width without drawing.
+pub fn measure_kbd(
+    font_system: &mut cosmic_text::FontSystem,
+    text: &str,
+    font_size: f32,
+    padding_x: f32,
+    font_family: &str,
+) -> (f32, f32) {
+    let text_w = draw::text_width(font_system, text, font_size, font_family);
+    (text_w + padding_x * 2.0, font_size + 4.0)
+}

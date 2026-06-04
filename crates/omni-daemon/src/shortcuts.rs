@@ -23,6 +23,7 @@ pub enum ShortcutAction {
     ShowWindowManager,
     ShowSystem,
     ShowSnippets,
+    ShowHelp,
 }
 
 pub struct ShortcutManager {
@@ -93,6 +94,15 @@ impl ShortcutManager {
             "Super+Alt+S".to_string(),
             qh,
             ShortcutAction::ShowSnippets,
+        );
+
+        mgr.register_shortcut(
+            "omni:help".to_string(),
+            "omni".to_string(),
+            "Open keyboard shortcuts".to_string(),
+            "F1".to_string(),
+            qh,
+            ShortcutAction::ShowHelp,
         );
     }
 }

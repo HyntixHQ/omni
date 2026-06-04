@@ -565,6 +565,7 @@ dependencies = [
  "omni-clipboard",
  "omni-core",
  "omni-daemon",
+ "omni-help",
  "omni-ipc",
  "omni-search",
  "omni-snippets",
@@ -654,6 +655,18 @@ dependencies = [
  "wayland-protocols-wlr",
  "wayland-scanner",
  "wisp",
+]
+
+[[package]]
+name = "omni-help"
+version = "0.1.0"
+dependencies = [
+ "cosmic-text",
+ "serde",
+ "tiny-skia",
+ "tracing",
+ "wisp",
+ "wisp-components",
 ]
 
 [[package]]

@@ -1,18 +1,19 @@
 [workspace]
 resolver = "2"
 members = [
-    "crates/wisp",
-    "crates/wisp-components",
     "crates/omni-core",
+    "crates/omni-ipc",
     "crates/omni-search",
-    "crates/omni-app-launcher",
     "crates/omni-daemon",
+    "crates/omni-app-launcher",
     "crates/omni-calculator",
     "crates/omni-clipboard",
-    "crates/omni-ipc",
     "crates/omni-wm",
     "crates/omni-system",
     "crates/omni-snippets",
+    "crates/omni-help",
+    "crates/wisp",
+    "crates/wisp-components",
 ]
 
 [package]
@@ -52,6 +53,7 @@ omni-search = { path = "crates/omni-search" }
 omni-wm = { path = "crates/omni-wm" }
 omni-system = { path = "crates/omni-system" }
 omni-snippets = { path = "crates/omni-snippets" }
+omni-help = { path = "crates/omni-help" }
 
 [workspace.package]
 publish = false

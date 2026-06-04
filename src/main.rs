@@ -12,6 +12,7 @@ use omni_calculator::{draw_calculator, CalcState};
 use omni_clipboard::{draw_clipboard, ClipboardState};
 use omni_daemon::shortcuts::ShortcutAction;
 use omni_daemon::Daemon;
+use omni_help::{build_categories, draw_help, handle_action as help_handle_action, HelpState};
 use omni_ipc::IpcCommand;
 use omni_snippets::{
     draw_snippets, handle_action as snippets_handle_action, load_from_disk as load_snippets_from_disk,
@@ -31,6 +32,7 @@ enum ActiveApp {
     Wm(WmState),
     System(SystemState),
     Snippets(SnippetsState),
+    Help(HelpState),
 }
 
 fn resize_for_app(daemon: &mut Daemon, app: &ActiveApp, config: &Config) -> (i32, i32) {
@@ -102,6 +104,10 @@ fn resize_for_app(daemon: &mut Daemon, app: &ActiveApp, config: &Config) -> (i32
             let total_h = (padding + header_h + gap + body_h + gap + footer_h + padding).round() as i32;
             (config.window.width, total_h)
         }
+        ActiveApp::Help(state) => {
+            let h = state.preferred_height();
+            (config.window.width, h)
+        }
     };
     let (cw, ch) = daemon.surface_size();
     if w != cw || h != ch {
@@ -117,6 +123,21 @@ fn load_snippets_for_open(config: &Config) -> Vec<Snippet> {
         return from_disk;
     }
     config.snippets.clone()
+}
+
+fn open_help(config: &Config) -> HelpState {
+    let s = &config.shortcuts;
+    let apps: Vec<(String, String)> = s.apps.iter().map(|(k, v)| (k.clone(), v.clone())).collect();
+    HelpState::new(build_categories(
+        s.launcher.as_deref(),
+        s.calculator.as_deref(),
+        s.clipboard.as_deref(),
+        s.wm.as_deref(),
+        s.system.as_deref(),
+        s.snippets.as_deref(),
+        s.help.as_deref(),
+        &apps,
+    ))
 }
 
 fn draw_frame(daemon: &mut Daemon, active: &mut ActiveApp, config: &Config, cursor_visible: bool) {
@@ -234,6 +255,25 @@ fn draw_frame(daemon: &mut Daemon, active: &mut ActiveApp, config: &Config, curs
                     &config.font.family,
                     config.theme.border_radius as f32,
                     snip_state,
+                    cursor_visible,
+                    mouse_y,
+                );
+            }
+            ActiveApp::Help(help_state) => {
+                draw_help(
+                    &mut surf.pixmap, font, swash,
+                    color_from_hex(&config.theme.bg),
+                    color_from_hex(&config.theme.fg),
+                    color_from_hex(&config.theme.selected_bg),
+                    color_from_hex(&config.theme.desc_fg),
+                    color_from_hex(&config.theme.caret),
+                    color_from_hex(&config.theme.border),
+                    color_from_hex(&config.theme.placeholder_fg),
+                    color_from_hex(&config.theme.caret),
+                    config.font.size as f32,
+                    &config.font.family,
+                    config.theme.border_radius as f32,
+                    help_state,
                     cursor_visible,
                     mouse_y,
                 );
@@ -431,6 +471,12 @@ fn run_daemon(config: Config) {
                     daemon.show_surface(w, h);
                     active = Some(app);
                 }
+                IpcCommand::Help => {
+                    let app = ActiveApp::Help(open_help(&config));
+                    let (w, h) = resize_for_app(&mut daemon, &app, &config);
+                    daemon.show_surface(w, h);
+                    active = Some(app);
+                }
             }
         }
 
@@ -479,6 +525,12 @@ fn run_daemon(config: Config) {
                     let last_clip = daemon.clipboard_entries().first().map(|e| e.text.clone());
                     let snip_state = SnippetsState::new(load_snippets_for_open(&config), last_clip);
                     let app = ActiveApp::Snippets(snip_state);
+                    let (w, h) = resize_for_app(&mut daemon, &app, &config);
+                    daemon.show_surface(w, h);
+                    active = Some(app);
+                }
+                ShortcutAction::ShowHelp => {
+                    let app = ActiveApp::Help(open_help(&config));
                     let (w, h) = resize_for_app(&mut daemon, &app, &config);
                     daemon.show_surface(w, h);
                     active = Some(app);
@@ -895,6 +947,53 @@ fn run_daemon(config: Config) {
                         daemon.clipboard_paste(&text);
                     }
                 }
+                ActiveApp::Help(help_state) => {
+                    let pointer = daemon.pointer().cloned();
+                    let cursor = if daemon.mouse_inside() {
+                        help_state.mouse.cursor_at(daemon.mouse_y())
+                    } else {
+                        wisp::CursorStyle::Arrow
+                    };
+                    if let Some(ref p) = pointer {
+                        daemon.cursor().set_cursor(p, cursor);
+                    }
+
+                    let row_height = omni_help::compute_row_height(
+                        daemon.font_system_mut(),
+                        config.font.size as f32,
+                        &config.font.family,
+                    );
+                    let delta = daemon.drain_scroll(row_height);
+                    if delta != 0.0
+                        && help_state.mouse.region_at(daemon.mouse_y(), daemon.mouse_y())
+                            == Some(wisp::events::RegionId::Body)
+                    {
+                        help_state.list_state.scroll.scroll_by(-delta);
+                        daemon.set_dirty();
+                    }
+
+                    for action in daemon.drain_actions() {
+                        if matches!(action, InputAction::Cancel) {
+                            hide = true;
+                        } else {
+                            help_handle_action(help_state, action);
+                            let nh = help_state.preferred_height();
+                            let (_, ch) = daemon.surface_size();
+                            if nh != ch {
+                                daemon.resize_surface(config.window.width, nh);
+                                daemon.poll();
+                            }
+                            daemon.set_dirty();
+                            daemon.mark_input();
+                        }
+                    }
+
+                    if let Some(action) = daemon.process_repeat() {
+                        help_handle_action(help_state, action);
+                        daemon.set_dirty();
+                        daemon.mark_input();
+                    }
+                }
             }
         }
 
@@ -939,6 +1038,8 @@ fn run_client(args: &[String], config: &Config) {
         "system\n".to_string()
     } else if args.iter().any(|a| a == "--snippets" || a == "-S") {
         "snippets\n".to_string()
+    } else if args.iter().any(|a| a == "--keys" || a == "-K") {
+        "help\n".to_string()
     } else if args.iter().any(|a| a == "--calculator" || a == "-c") {
         if args.len() > 2 && !args[2].starts_with('-') {
             format!("calculator:{}\n", args[2])
