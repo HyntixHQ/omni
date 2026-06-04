@@ -20,6 +20,7 @@ pub enum ShortcutAction {
     ShowLauncher,
     ShowCalculator,
     ShowClipboard,
+    ShowWindowManager,
 }
 
 pub struct ShortcutManager {
@@ -63,6 +64,15 @@ impl ShortcutManager {
             "Super+V".to_string(),
             qh,
             ShortcutAction::ShowClipboard,
+        );
+
+        mgr.register_shortcut(
+            "omni:wm".to_string(),
+            "omni".to_string(),
+            "Open window manager".to_string(),
+            "Super+Alt+W".to_string(),
+            qh,
+            ShortcutAction::ShowWindowManager,
         );
     }
 }

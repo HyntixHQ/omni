@@ -16,6 +16,7 @@ wisp = { path = "../wisp" }
 wisp-components = { path = "../wisp-components" }
 omni-core = { path = "../omni-core" }
 omni-search = { path = "../omni-search" }
+omni-wm = { path = "../omni-wm" }
 tiny-skia.workspace = true
 cosmic-text.workspace = true
 resvg.workspace = true

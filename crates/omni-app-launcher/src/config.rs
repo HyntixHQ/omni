@@ -11,6 +11,14 @@ pub struct Config {
     pub icons: IconConfig,
     #[serde(default)]
     pub shortcuts: ShortcutsConfig,
+    #[serde(default)]
+    pub wm: WmConfig,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct WmConfig {
+    #[serde(default)]
+    pub custom: Vec<omni_wm::CustomLayout>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -65,6 +73,8 @@ pub struct ShortcutsConfig {
     #[serde(default)]
     pub clipboard: Option<String>,
     #[serde(default)]
+    pub wm: Option<String>,
+    #[serde(default)]
     pub apps: HashMap<String, String>,
 }
 
@@ -74,6 +84,7 @@ impl Default for ShortcutsConfig {
             launcher: Some("Super+Space".into()),
             calculator: Some("Super+Alt+C".into()),
             clipboard: Some("Super+V".into()),
+            wm: Some("Super+Alt+W".into()),
             apps: HashMap::new(),
         }
     }
@@ -158,7 +169,7 @@ impl Config {
     }
 
     fn apply_overrides(&mut self, overrides: Config) {
-        let Config { window, theme, font, icons, shortcuts } = overrides;
+        let Config { window, theme, font, icons, shortcuts, wm } = overrides;
         if window.width != WindowConfig::default().width { self.window.width = window.width; }
         self.window.height = window.height;
         self.window.margin = window.margin;
@@ -170,6 +181,7 @@ impl Config {
         if !icons.cursor_theme.is_empty() { self.icons.cursor_theme = icons.cursor_theme; }
         self.icons.size = icons.size;
         self.shortcuts = shortcuts;
+        self.wm = wm;
     }
 }
 

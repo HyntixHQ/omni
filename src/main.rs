@@ -13,6 +13,7 @@ use omni_clipboard::{draw_clipboard, ClipboardState};
 use omni_daemon::shortcuts::ShortcutAction;
 use omni_daemon::Daemon;
 use omni_ipc::IpcCommand;
+use omni_wm::{detect_compositor, draw_wm, handle_action as wm_handle_action, WmState};
 
 #[cfg(not(target_env = "msvc"))]
 #[global_allocator]
@@ -22,6 +23,7 @@ enum ActiveApp {
     Launcher(Box<OmniApp>),
     Calculator(CalcState),
     Clipboard(ClipboardState),
+    Wm(WmState),
 }
 
 fn resize_for_app(daemon: &mut Daemon, app: &ActiveApp, config: &Config) -> (i32, i32) {
@@ -50,6 +52,20 @@ fn resize_for_app(daemon: &mut Daemon, app: &ActiveApp, config: &Config) -> (i32
             let bottom_pad = 10.0;
             let h = (pad + label_h + input_h + gap + result_h + gap + footer_h + bottom_pad) as i32;
             (config.window.width, h)
+        }
+        ActiveApp::Wm(_) => {
+            let row_h = omni_wm::state::compute_row_height(
+                daemon.font_system_mut(),
+                config.font.size as f32,
+                &config.font.family,
+            );
+            let padding = 10.0f32;
+            let header_h = 42.0f32;
+            let footer_h = 28.0f32;
+            let gap = 8.0f32;
+            let body_h = (8.0 * row_h).round();
+            let total_h = (padding + header_h + gap + body_h + gap + footer_h + padding).round() as i32;
+            (config.window.width, total_h)
         }
     };
     let (cw, ch) = daemon.surface_size();
@@ -114,6 +130,26 @@ fn draw_frame(daemon: &mut Daemon, active: &mut ActiveApp, config: &Config, curs
                     &config.font.family,
                     config.theme.border_radius as f32,
                     clipboard_state,
+                    cursor_visible,
+                    mouse_y,
+                );
+            }
+            ActiveApp::Wm(wm_state) => {
+                draw_wm(
+                    &mut surf.pixmap, font, swash,
+                    color_from_hex(&config.theme.bg),
+                    color_from_hex(&config.theme.fg),
+                    color_from_hex(&config.theme.selected_bg),
+                    color_from_hex(&config.theme.placeholder_fg),
+                    color_from_hex(&config.theme.desc_fg),
+                    color_from_hex(&config.theme.caret),
+                    color_from_hex(&config.theme.border),
+                    color_from_hex(&config.theme.placeholder_fg),
+                    color_from_hex(&config.theme.caret),
+                    config.font.size as f32,
+                    &config.font.family,
+                    config.theme.border_radius as f32,
+                    wm_state,
                     cursor_visible,
                     mouse_y,
                 );
@@ -203,6 +239,12 @@ fn run_daemon(config: Config) {
             keys: keys.clone(),
         });
     }
+    if let Some(keys) = &config.shortcuts.wm {
+        shortcuts.push(omni_daemon::sway_backend::ShortcutEntry {
+            id: "wm".into(),
+            keys: keys.clone(),
+        });
+    }
     for (app_id, keys) in &config.shortcuts.apps {
         shortcuts.push(omni_daemon::sway_backend::ShortcutEntry {
             id: format!("app:{}", app_id),
@@ -266,6 +308,14 @@ fn run_daemon(config: Config) {
                     daemon.show_surface(w, h);
                     active = Some(app);
                 }
+                IpcCommand::WindowManager => {
+                    let compositor = detect_compositor();
+                    let wm_state = WmState::new(compositor, &config.wm.custom);
+                    let app = ActiveApp::Wm(wm_state);
+                    let (w, h) = resize_for_app(&mut daemon, &app, &config);
+                    daemon.show_surface(w, h);
+                    active = Some(app);
+                }
             }
         }
 
@@ -287,6 +337,14 @@ fn run_daemon(config: Config) {
                     let entries = daemon.clipboard_entries();
                     let clipboard_state = ClipboardState::with_entries(entries);
                     let app = ActiveApp::Clipboard(clipboard_state);
+                    let (w, h) = resize_for_app(&mut daemon, &app, &config);
+                    daemon.show_surface(w, h);
+                    active = Some(app);
+                }
+                ShortcutAction::ShowWindowManager => {
+                    let compositor = detect_compositor();
+                    let wm_state = WmState::new(compositor, &config.wm.custom);
+                    let app = ActiveApp::Wm(wm_state);
                     let (w, h) = resize_for_app(&mut daemon, &app, &config);
                     daemon.show_surface(w, h);
                     active = Some(app);
@@ -483,6 +541,68 @@ fn run_daemon(config: Config) {
                         }
                     }
                 }
+                ActiveApp::Wm(wm_state) => {
+                    let pointer = daemon.pointer().cloned();
+                    let cursor = if daemon.mouse_inside() {
+                        wm_state.mouse.cursor_at(daemon.mouse_y())
+                    } else {
+                        wisp::CursorStyle::Arrow
+                    };
+                    if let Some(ref p) = pointer {
+                        daemon.cursor().set_cursor(p, cursor);
+                    }
+
+                    let row_height = omni_wm::state::compute_row_height(
+                        daemon.font_system_mut(),
+                        config.font.size as f32,
+                        &config.font.family,
+                    );
+                    let delta = daemon.drain_scroll(row_height);
+                    if delta != 0.0
+                        && wm_state.mouse.region_at(daemon.mouse_y(), daemon.mouse_y()) == Some(wisp::events::RegionId::Body)
+                    {
+                        wm_state.list_state.scroll.scroll_by(-delta);
+                        daemon.set_dirty();
+                    }
+
+                    for action in daemon.drain_actions() {
+                        let body_h = wm_state.mouse.body_bounds().map_or(0.0, |(_, h)| h);
+                        match action {
+                            InputAction::Confirm => {
+                                wm_state.execute_selected();
+                                hide = true;
+                            }
+                            InputAction::Cancel => {
+                                hide = true;
+                            }
+                            InputAction::Click { x: _, y } => {
+                                if let Some((body_y, _)) = wm_state.mouse.body_bounds() {
+                                    let rel_y = y as f32 - body_y;
+                                    if let Some(idx) = wm_state.list_state.index_at(rel_y, row_height) {
+                                        let items = wm_state.filtered();
+                                        if idx < items.len() {
+                                            wm_state.list_state.selected_index = idx;
+                                            items[idx].execute(wm_state.compositor);
+                                        }
+                                    }
+                                    hide = true;
+                                }
+                            }
+                            _ => {
+                                wm_handle_action(wm_state, action, row_height, body_h);
+                                daemon.set_dirty();
+                                daemon.mark_input();
+                            }
+                        }
+                    }
+
+                    if let Some(action) = daemon.process_repeat() {
+                        let body_h = wm_state.mouse.body_bounds().map_or(0.0, |(_, h)| h);
+                        wm_handle_action(wm_state, action, row_height, body_h);
+                        daemon.set_dirty();
+                        daemon.mark_input();
+                    }
+                }
             }
         }
 
@@ -521,6 +641,8 @@ fn run_client(args: &[String], config: &Config) {
 
     let cmd = if args.iter().any(|a| a == "--clipboard") {
         "clipboard\n".to_string()
+    } else if args.iter().any(|a| a == "--wm" || a == "-w") {
+        "wm\n".to_string()
     } else if args.iter().any(|a| a == "--calculator" || a == "-c") {
         if args.len() > 2 && !args[2].starts_with('-') {
             format!("calculator:{}\n", args[2])
@@ -549,6 +671,10 @@ fn handle_shortcut(id: &str, config: &Config) {
         "clipboard" => {
             let mut socket = ipc_connect();
             let _ = socket.write_all(b"clipboard\n");
+        }
+        "wm" => {
+            let mut socket = ipc_connect();
+            let _ = socket.write_all(b"wm\n");
         }
         app_id => {
             let clean_id = app_id.strip_prefix("app:").unwrap_or(app_id);
