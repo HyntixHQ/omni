@@ -680,8 +680,10 @@ name = "omni-snippets"
 version = "0.1.0"
 dependencies = [
  "cosmic-text",
+ "dirs",
  "serde",
  "tiny-skia",
+ "toml",
  "tracing",
  "wisp",
  "wisp-components",

@@ -195,5 +195,10 @@ pub fn handle_action(app: &mut OmniApp, action: wisp::input::InputAction, row_he
         wisp::input::InputAction::AppendChar(ch) => app.insert_char(ch),
         wisp::input::InputAction::Click { .. } => {}
         wisp::input::InputAction::None => {}
+        wisp::input::InputAction::Tab => {}
+        wisp::input::InputAction::BackTab => {}
+        wisp::input::InputAction::Save => {}
+        wisp::input::InputAction::Create => {}
+        wisp::input::InputAction::Edit => {}
     }
 }

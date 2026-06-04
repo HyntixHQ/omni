@@ -17,3 +17,5 @@ wisp = { path = "../wisp" }
 wisp-components = { path = "../wisp-components" }
 serde = { workspace = true, features = ["derive"] }
 tracing.workspace = true
+dirs = "5"
+toml = "0.8"

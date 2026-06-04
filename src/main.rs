@@ -13,7 +13,10 @@ use omni_clipboard::{draw_clipboard, ClipboardState};
 use omni_daemon::shortcuts::ShortcutAction;
 use omni_daemon::Daemon;
 use omni_ipc::IpcCommand;
-use omni_snippets::{draw_snippets, handle_action as snippets_handle_action, SnippetsState};
+use omni_snippets::{
+    draw_snippets, handle_action as snippets_handle_action, load_from_disk as load_snippets_from_disk,
+    save_to_disk as save_snippets_to_disk, Snippet, SnippetsState,
+};
 use omni_system::{draw_system, handle_action as system_handle_action, SystemState};
 use omni_wm::{detect_compositor, draw_wm, handle_action as wm_handle_action, WmState};
 
@@ -106,6 +109,14 @@ fn resize_for_app(daemon: &mut Daemon, app: &ActiveApp, config: &Config) -> (i32
         daemon.poll();
     }
     (w, h)
+}
+
+fn load_snippets_for_open(config: &Config) -> Vec<Snippet> {
+    let from_disk = load_snippets_from_disk();
+    if !from_disk.is_empty() || omni_snippets::snippets_path().is_some_and(|p| p.exists()) {
+        return from_disk;
+    }
+    config.snippets.clone()
 }
 
 fn draw_frame(daemon: &mut Daemon, active: &mut ActiveApp, config: &Config, cursor_visible: bool) {
@@ -414,7 +425,7 @@ fn run_daemon(config: Config) {
                 }
                 IpcCommand::Snippets => {
                     let last_clip = daemon.clipboard_entries().first().map(|e| e.text.clone());
-                    let snip_state = SnippetsState::new(config.snippets.clone(), last_clip);
+                    let snip_state = SnippetsState::new(load_snippets_for_open(&config), last_clip);
                     let app = ActiveApp::Snippets(snip_state);
                     let (w, h) = resize_for_app(&mut daemon, &app, &config);
                     daemon.show_surface(w, h);
@@ -466,7 +477,7 @@ fn run_daemon(config: Config) {
                 }
                 ShortcutAction::ShowSnippets => {
                     let last_clip = daemon.clipboard_entries().first().map(|e| e.text.clone());
-                    let snip_state = SnippetsState::new(config.snippets.clone(), last_clip);
+                    let snip_state = SnippetsState::new(load_snippets_for_open(&config), last_clip);
                     let app = ActiveApp::Snippets(snip_state);
                     let (w, h) = resize_for_app(&mut daemon, &app, &config);
                     daemon.show_surface(w, h);
@@ -812,20 +823,24 @@ fn run_daemon(config: Config) {
                         daemon.set_dirty();
                     }
 
+                    let in_form = matches!(
+                        snip_state.mode,
+                        omni_snippets::SnippetMode::Form { .. } | omni_snippets::SnippetMode::ConfirmDelete { .. }
+                    );
                     let mut pending_copy: Option<String> = None;
+                    let mut needs_save = false;
                     for action in daemon.drain_actions() {
-                        let body_h = snip_state.mouse.body_bounds().map_or(0.0, |(_, h)| h);
                         match action {
-                            InputAction::Confirm => {
+                            InputAction::Confirm if !in_form => {
                                 if let Some(snip) = snip_state.selected() {
                                     pending_copy = Some(snip_state.expand(&snip));
                                 }
                                 hide = true;
                             }
-                            InputAction::Cancel => {
+                            InputAction::Cancel if !in_form => {
                                 hide = true;
                             }
-                            InputAction::Click { x: _, y } => {
+                            InputAction::Click { x: _, y } if !in_form => {
                                 if let Some((body_y, _)) = snip_state.mouse.body_bounds() {
                                     let rel_y = y as f32 - body_y;
                                     if let Some(idx) = snip_state.list_state.index_at(rel_y, row_height) {
@@ -839,7 +854,19 @@ fn run_daemon(config: Config) {
                                 }
                             }
                             _ => {
-                                snippets_handle_action(snip_state, action, row_height, body_h);
+                                let was_form = matches!(snip_state.mode, omni_snippets::SnippetMode::Form { .. });
+                                let was_confirm =
+                                    matches!(snip_state.mode, omni_snippets::SnippetMode::ConfirmDelete { .. });
+                                snippets_handle_action(snip_state, action);
+                                let now_form = matches!(snip_state.mode, omni_snippets::SnippetMode::Form { .. });
+                                let now_browse = matches!(snip_state.mode, omni_snippets::SnippetMode::Browse);
+                                if was_form && now_browse {
+                                    needs_save = true;
+                                }
+                                if was_confirm && now_browse {
+                                    needs_save = true;
+                                }
+                                let _ = (was_form, was_confirm, now_form);
                                 if let Some(snip) = snip_state.exact_shortcut_match() {
                                     pending_copy = Some(snip_state.expand(&snip));
                                     hide = true;
@@ -851,10 +878,17 @@ fn run_daemon(config: Config) {
                     }
 
                     if let Some(action) = daemon.process_repeat() {
-                        let body_h = snip_state.mouse.body_bounds().map_or(0.0, |(_, h)| h);
-                        snippets_handle_action(snip_state, action, row_height, body_h);
+                        snippets_handle_action(snip_state, action);
                         daemon.set_dirty();
                         daemon.mark_input();
+                    }
+
+                    if needs_save {
+                        if let Err(e) = save_snippets_to_disk(&snip_state.all_entries) {
+                            tracing::warn!("failed to save snippets: {e}");
+                        } else {
+                            tracing::info!("saved {} snippets to disk", snip_state.all_entries.len());
+                        }
                     }
 
                     if let Some(text) = pending_copy {

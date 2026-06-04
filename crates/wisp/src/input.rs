@@ -32,6 +32,11 @@ pub enum InputAction {
     Copy,
     Cut,
     Paste,
+    Tab,
+    BackTab,
+    Save,
+    Create,
+    Edit,
 }
 
 // ── GPUI-aligned mouse types ─────────────────────────────
@@ -270,6 +275,8 @@ fn translate_sym(sym: xkb::Keysym, ctrl: bool, shift: bool, _alt: bool, _super: 
             Keysym::x | Keysym::X => return InputAction::Cut,
             Keysym::v | Keysym::V => return InputAction::Paste,
             Keysym::a | Keysym::A => return InputAction::SelectAll,
+            Keysym::s | Keysym::S => return InputAction::Save,
+            Keysym::n | Keysym::N => return InputAction::Create,
             _ => {}
         }
     }
@@ -291,6 +298,14 @@ fn translate_sym(sym: xkb::Keysym, ctrl: bool, shift: bool, _alt: bool, _super: 
                 InputAction::Delete
             }
         }
+        Keysym::Tab => {
+            if shift {
+                InputAction::BackTab
+            } else {
+                InputAction::Tab
+            }
+        }
+        Keysym::F2 => InputAction::Edit,
         Keysym::Left | Keysym::KP_Left if shift && ctrl => InputAction::SelectWordLeft,
         Keysym::Right | Keysym::KP_Right if shift && ctrl => InputAction::SelectWordRight,
         Keysym::Left | Keysym::KP_Left if shift => InputAction::SelectLeft,
