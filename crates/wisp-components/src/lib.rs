@@ -4,8 +4,10 @@ pub mod input;
 pub mod kbd;
 pub mod label;
 pub mod list_view;
+pub mod preview_row;
 pub mod scroll_area;
 pub mod separator;
+pub mod wm_preview;
 
 pub use badge::{badge, badge_size, badge_variant_colors, BadgeColors, BadgeProps, BadgeVariant};
 pub use command::{command_palette, CommandColors, CommandItem, CommandProps};
@@ -13,5 +15,7 @@ pub use input::{input, InputProps};
 pub use kbd::{kbd, KbdProps};
 pub use label::{label, LabelProps};
 pub use list_view::{draw_list, row_height, row_height_compact, ListColors, ListItem, ListState};
+pub use preview_row::{draw_preview_rows, preview_row_height, PreviewRow, PreviewRowSize};
 pub use scroll_area::{scrollbar, ScrollBarColors};
 pub use separator::{h_separator, separator, v_separator, SeparatorOrientation, SeparatorProps};
+pub use wm_preview::{draw_preview, PreviewColors, PreviewSpec};
