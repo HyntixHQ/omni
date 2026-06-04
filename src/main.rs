@@ -13,6 +13,7 @@ use omni_clipboard::{draw_clipboard, ClipboardState};
 use omni_daemon::shortcuts::ShortcutAction;
 use omni_daemon::Daemon;
 use omni_ipc::IpcCommand;
+use omni_snippets::{draw_snippets, handle_action as snippets_handle_action, SnippetsState};
 use omni_system::{draw_system, handle_action as system_handle_action, SystemState};
 use omni_wm::{detect_compositor, draw_wm, handle_action as wm_handle_action, WmState};
 
@@ -26,6 +27,7 @@ enum ActiveApp {
     Clipboard(ClipboardState),
     Wm(WmState),
     System(SystemState),
+    Snippets(SnippetsState),
 }
 
 fn resize_for_app(daemon: &mut Daemon, app: &ActiveApp, config: &Config) -> (i32, i32) {
@@ -71,6 +73,20 @@ fn resize_for_app(daemon: &mut Daemon, app: &ActiveApp, config: &Config) -> (i32
         }
         ActiveApp::System(_) => {
             let row_h = omni_system::compute_row_height(
+                daemon.font_system_mut(),
+                config.font.size as f32,
+                &config.font.family,
+            );
+            let padding = 10.0f32;
+            let header_h = 42.0f32;
+            let footer_h = 28.0f32;
+            let gap = 8.0f32;
+            let body_h = (8.0 * row_h).round();
+            let total_h = (padding + header_h + gap + body_h + gap + footer_h + padding).round() as i32;
+            (config.window.width, total_h)
+        }
+        ActiveApp::Snippets(_) => {
+            let row_h = omni_snippets::compute_row_height(
                 daemon.font_system_mut(),
                 config.font.size as f32,
                 &config.font.family,
@@ -191,6 +207,26 @@ fn draw_frame(daemon: &mut Daemon, active: &mut ActiveApp, config: &Config, curs
                     mouse_y,
                 );
             }
+            ActiveApp::Snippets(snip_state) => {
+                draw_snippets(
+                    &mut surf.pixmap, font, swash,
+                    color_from_hex(&config.theme.bg),
+                    color_from_hex(&config.theme.fg),
+                    color_from_hex(&config.theme.selected_bg),
+                    color_from_hex(&config.theme.placeholder_fg),
+                    color_from_hex(&config.theme.desc_fg),
+                    color_from_hex(&config.theme.caret),
+                    color_from_hex(&config.theme.border),
+                    color_from_hex(&config.theme.placeholder_fg),
+                    color_from_hex(&config.theme.caret),
+                    config.font.size as f32,
+                    &config.font.family,
+                    config.theme.border_radius as f32,
+                    snip_state,
+                    cursor_visible,
+                    mouse_y,
+                );
+            }
         }
         if let Some(mmap) = surf.mmap.as_mut() {
             rgba_to_bgra(surf.pixmap.data(), unsafe {
@@ -288,6 +324,12 @@ fn run_daemon(config: Config) {
             keys: keys.clone(),
         });
     }
+    if let Some(keys) = &config.shortcuts.snippets {
+        shortcuts.push(omni_daemon::sway_backend::ShortcutEntry {
+            id: "snippets".into(),
+            keys: keys.clone(),
+        });
+    }
     for (app_id, keys) in &config.shortcuts.apps {
         shortcuts.push(omni_daemon::sway_backend::ShortcutEntry {
             id: format!("app:{}", app_id),
@@ -370,6 +412,14 @@ fn run_daemon(config: Config) {
                     daemon.show_surface(w, h);
                     active = Some(app);
                 }
+                IpcCommand::Snippets => {
+                    let last_clip = daemon.clipboard_entries().first().map(|e| e.text.clone());
+                    let snip_state = SnippetsState::new(config.snippets.clone(), last_clip);
+                    let app = ActiveApp::Snippets(snip_state);
+                    let (w, h) = resize_for_app(&mut daemon, &app, &config);
+                    daemon.show_surface(w, h);
+                    active = Some(app);
+                }
             }
         }
 
@@ -410,6 +460,14 @@ fn run_daemon(config: Config) {
                     }
                     sys_state.entries = sys_state.all_entries.clone();
                     let app = ActiveApp::System(sys_state);
+                    let (w, h) = resize_for_app(&mut daemon, &app, &config);
+                    daemon.show_surface(w, h);
+                    active = Some(app);
+                }
+                ShortcutAction::ShowSnippets => {
+                    let last_clip = daemon.clipboard_entries().first().map(|e| e.text.clone());
+                    let snip_state = SnippetsState::new(config.snippets.clone(), last_clip);
+                    let app = ActiveApp::Snippets(snip_state);
                     let (w, h) = resize_for_app(&mut daemon, &app, &config);
                     daemon.show_surface(w, h);
                     active = Some(app);
@@ -730,6 +788,79 @@ fn run_daemon(config: Config) {
                         daemon.mark_input();
                     }
                 }
+                ActiveApp::Snippets(snip_state) => {
+                    let pointer = daemon.pointer().cloned();
+                    let cursor = if daemon.mouse_inside() {
+                        snip_state.mouse.cursor_at(daemon.mouse_y())
+                    } else {
+                        wisp::CursorStyle::Arrow
+                    };
+                    if let Some(ref p) = pointer {
+                        daemon.cursor().set_cursor(p, cursor);
+                    }
+
+                    let row_height = omni_snippets::compute_row_height(
+                        daemon.font_system_mut(),
+                        config.font.size as f32,
+                        &config.font.family,
+                    );
+                    let delta = daemon.drain_scroll(row_height);
+                    if delta != 0.0
+                        && snip_state.mouse.region_at(daemon.mouse_y(), daemon.mouse_y()) == Some(wisp::events::RegionId::Body)
+                    {
+                        snip_state.list_state.scroll.scroll_by(-delta);
+                        daemon.set_dirty();
+                    }
+
+                    let mut pending_copy: Option<String> = None;
+                    for action in daemon.drain_actions() {
+                        let body_h = snip_state.mouse.body_bounds().map_or(0.0, |(_, h)| h);
+                        match action {
+                            InputAction::Confirm => {
+                                if let Some(snip) = snip_state.selected() {
+                                    pending_copy = Some(snip_state.expand(&snip));
+                                }
+                                hide = true;
+                            }
+                            InputAction::Cancel => {
+                                hide = true;
+                            }
+                            InputAction::Click { x: _, y } => {
+                                if let Some((body_y, _)) = snip_state.mouse.body_bounds() {
+                                    let rel_y = y as f32 - body_y;
+                                    if let Some(idx) = snip_state.list_state.index_at(rel_y, row_height) {
+                                        let items = snip_state.filtered();
+                                        if idx < items.len() {
+                                            snip_state.list_state.selected_index = idx;
+                                            pending_copy = Some(snip_state.expand(&items[idx]));
+                                        }
+                                    }
+                                    hide = true;
+                                }
+                            }
+                            _ => {
+                                snippets_handle_action(snip_state, action, row_height, body_h);
+                                if let Some(snip) = snip_state.exact_shortcut_match() {
+                                    pending_copy = Some(snip_state.expand(&snip));
+                                    hide = true;
+                                }
+                                daemon.set_dirty();
+                                daemon.mark_input();
+                            }
+                        }
+                    }
+
+                    if let Some(action) = daemon.process_repeat() {
+                        let body_h = snip_state.mouse.body_bounds().map_or(0.0, |(_, h)| h);
+                        snippets_handle_action(snip_state, action, row_height, body_h);
+                        daemon.set_dirty();
+                        daemon.mark_input();
+                    }
+
+                    if let Some(text) = pending_copy {
+                        daemon.clipboard_paste(&text);
+                    }
+                }
             }
         }
 
@@ -772,6 +903,8 @@ fn run_client(args: &[String], config: &Config) {
         "wm\n".to_string()
     } else if args.iter().any(|a| a == "--system" || a == "-s") {
         "system\n".to_string()
+    } else if args.iter().any(|a| a == "--snippets" || a == "-S") {
+        "snippets\n".to_string()
     } else if args.iter().any(|a| a == "--calculator" || a == "-c") {
         if args.len() > 2 && !args[2].starts_with('-') {
             format!("calculator:{}\n", args[2])
@@ -808,6 +941,10 @@ fn handle_shortcut(id: &str, config: &Config) {
         "system" => {
             let mut socket = ipc_connect();
             let _ = socket.write_all(b"system\n");
+        }
+        "snippets" => {
+            let mut socket = ipc_connect();
+            let _ = socket.write_all(b"snippets\n");
         }
         app_id => {
             let clean_id = app_id.strip_prefix("app:").unwrap_or(app_id);

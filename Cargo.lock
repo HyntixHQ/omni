@@ -567,6 +567,7 @@ dependencies = [
  "omni-daemon",
  "omni-ipc",
  "omni-search",
+ "omni-snippets",
  "omni-system",
  "omni-wm",
  "serde",
@@ -592,6 +593,7 @@ dependencies = [
  "image",
  "omni-core",
  "omni-search",
+ "omni-snippets",
  "omni-system",
  "omni-wm",
  "resvg",
@@ -671,6 +673,18 @@ dependencies = [
  "omni-core",
  "serde",
  "tracing",
+]
+
+[[package]]
+name = "omni-snippets"
+version = "0.1.0"
+dependencies = [
+ "cosmic-text",
+ "serde",
+ "tiny-skia",
+ "tracing",
+ "wisp",
+ "wisp-components",
 ]
 
 [[package]]

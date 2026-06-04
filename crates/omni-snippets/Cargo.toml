@@ -1,0 +1,19 @@
+[package]
+name = "omni-snippets"
+version = "0.1.0"
+edition.workspace = true
+authors.workspace = true
+homepage.workspace = true
+repository.workspace = true
+license.workspace = true
+
+[lints]
+workspace = true
+
+[dependencies]
+tiny-skia.workspace = true
+cosmic-text.workspace = true
+wisp = { path = "../wisp" }
+wisp-components = { path = "../wisp-components" }
+serde = { workspace = true, features = ["derive"] }
+tracing.workspace = true

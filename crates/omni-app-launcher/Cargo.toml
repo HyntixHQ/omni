@@ -18,6 +18,7 @@ omni-core = { path = "../omni-core" }
 omni-search = { path = "../omni-search" }
 omni-wm = { path = "../omni-wm" }
 omni-system = { path = "../omni-system" }
+omni-snippets = { path = "../omni-snippets" }
 tiny-skia.workspace = true
 cosmic-text.workspace = true
 resvg.workspace = true

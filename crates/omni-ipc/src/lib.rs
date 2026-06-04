@@ -8,6 +8,7 @@ pub enum IpcCommand {
     Clipboard,
     WindowManager,
     System,
+    Snippets,
     Quit,
 }
 
@@ -20,6 +21,7 @@ impl IpcCommand {
             "clipboard" => Some(IpcCommand::Clipboard),
             "wm" | "window-manager" | "window_manager" => Some(IpcCommand::WindowManager),
             "system" | "sys" | "system-commands" | "system_commands" => Some(IpcCommand::System),
+            "snippets" | "snippet" | "snip" | "S" => Some(IpcCommand::Snippets),
             "quit" => Some(IpcCommand::Quit),
             _ if line.starts_with("calculator:") => {
                 Some(IpcCommand::Calculator(Some(line["calculator:".len()..].to_string())))
@@ -36,6 +38,7 @@ impl IpcCommand {
             IpcCommand::Clipboard => "clipboard\n".to_string(),
             IpcCommand::WindowManager => "wm\n".to_string(),
             IpcCommand::System => "system\n".to_string(),
+            IpcCommand::Snippets => "snippets\n".to_string(),
             IpcCommand::Quit => "quit\n".to_string(),
         }
     }

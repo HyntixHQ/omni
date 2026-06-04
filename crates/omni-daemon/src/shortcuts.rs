@@ -22,6 +22,7 @@ pub enum ShortcutAction {
     ShowClipboard,
     ShowWindowManager,
     ShowSystem,
+    ShowSnippets,
 }
 
 pub struct ShortcutManager {
@@ -83,6 +84,15 @@ impl ShortcutManager {
             "Super+Alt+X".to_string(),
             qh,
             ShortcutAction::ShowSystem,
+        );
+
+        mgr.register_shortcut(
+            "omni:snippets".to_string(),
+            "omni".to_string(),
+            "Open snippets".to_string(),
+            "Super+Alt+S".to_string(),
+            qh,
+            ShortcutAction::ShowSnippets,
         );
     }
 }

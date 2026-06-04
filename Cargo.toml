@@ -12,6 +12,7 @@ members = [
     "crates/omni-ipc",
     "crates/omni-wm",
     "crates/omni-system",
+    "crates/omni-snippets",
 ]
 
 [package]
@@ -50,6 +51,7 @@ omni-clipboard = { path = "crates/omni-clipboard" }
 omni-search = { path = "crates/omni-search" }
 omni-wm = { path = "crates/omni-wm" }
 omni-system = { path = "crates/omni-system" }
+omni-snippets = { path = "crates/omni-snippets" }
 
 [workspace.package]
 publish = false
