@@ -7,6 +7,7 @@ use wisp::text::TextEditor;
 use wisp_components::badge::{badge, BadgeColors, BadgeProps, BadgeVariant};
 use wisp_components::input;
 use wisp_components::list_view::{draw_list, row_height, ListColors, ListItem, ListState};
+use wisp_components::Icon;
 
 use crate::snippet::{expand_placeholders, Snippet};
 
@@ -635,7 +636,7 @@ fn draw_browse(
                     focused: false,
                     colors: Some(badge_colors),
                     icon: None,
-                    lucide_icon: None,
+                    lucide_icon: Some(Icon::Keyboard),
                 },
                 font_family,
             );

@@ -6,6 +6,7 @@ use wisp::input::InputAction;
 use wisp_components::badge::{badge, BadgeColors, BadgeProps, BadgeVariant};
 use wisp_components::input;
 use wisp_components::list_view::{draw_list, row_height, ListColors, ListItem, ListState};
+use wisp_components::Icon;
 
 use crate::commands::{preset_commands, SystemEntry};
 use crate::compositor::{compositor_name, detect_compositor, Compositor};
@@ -113,6 +114,19 @@ pub fn compute_row_height(
     font_family: &str,
 ) -> f32 {
     row_height(font_system, font_size, font_family)
+}
+
+fn system_category_icon(category: &str) -> Option<Icon> {
+    Some(match category {
+        "Session" => Icon::Lock,
+        "Power" => Icon::Power,
+        "Display" => Icon::Monitor,
+        "Audio" => Icon::Speaker,
+        "Brightness" => Icon::Sun,
+        "Bluetooth" => Icon::Bluetooth,
+        "Network" => Icon::Wifi,
+        _ => return None,
+    })
 }
 
 pub fn draw_system(
@@ -284,7 +298,7 @@ pub fn draw_system(
                 focused: false,
                 colors: Some(badge_colors),
                 icon: None,
-                lucide_icon: None,
+                lucide_icon: system_category_icon(&item.category),
             },
             font_family,
         );
@@ -307,7 +321,7 @@ pub fn draw_system(
                     focused: false,
                     colors: Some(badge_colors),
                     icon: None,
-                    lucide_icon: None,
+                    lucide_icon: Some(Icon::AlertTriangle),
                 },
                 font_family,
             );

@@ -3,9 +3,13 @@ use tiny_skia::{Color, Pixmap};
 use wisp::draw::{self, color_from_hex};
 use wisp::events::MouseDispatcher;
 use wisp::input::InputAction;
+use wisp_components::badge::{badge, BadgeColors, BadgeProps, BadgeVariant};
 use wisp_components::input;
 use wisp_components::list_view::ListState;
-use wisp_components::{draw_preview_rows, preview_row_height, ListColors, PreviewRow, PreviewRowSize, PreviewColors};
+use wisp_components::Icon;
+use wisp_components::{
+    draw_preview_rows, preview_row_height, ListColors, PreviewColors, PreviewRow, PreviewRowSize,
+};
 
 use crate::compositor::{compositor_name, query_monitors, query_workspaces, Compositor};
 use crate::ops::{all_operations, workspace_dynamic_ops, CustomLayout, WmEntry};
@@ -113,8 +117,33 @@ pub fn handle_action(state: &mut WmState, action: InputAction, row_height: f32, 
     }
 }
 
-pub fn compute_row_height(font_system: &mut cosmic_text::FontSystem, font_size: f32, font_family: &str) -> f32 {
+pub fn compute_row_height(
+    font_system: &mut cosmic_text::FontSystem,
+    font_size: f32,
+    font_family: &str,
+) -> f32 {
     preview_row_height(font_system, font_size, font_family)
+}
+
+fn wm_category_icon(category: &str) -> Option<Icon> {
+    Some(match category {
+        "Window & Layout" => Icon::Layout,
+        "Focus" => Icon::Crosshair,
+        "Move" => Icon::Move,
+        "Resize" => Icon::Maximize2,
+        "Halves" => Icon::Columns,
+        "Thirds" => Icon::Columns,
+        "Quarters" => Icon::Grid2X2,
+        "Maximize & Center" => Icon::Maximize2,
+        "Size" => Icon::Expand,
+        "Sixths" => Icon::Grid,
+        "Workspace" => Icon::Layers,
+        "Scratchpad" => Icon::PanelBottom,
+        "Display" => Icon::Monitor,
+        "Display Switch" => Icon::Monitor,
+        "Custom" => Icon::Cog,
+        _ => return None,
+    })
 }
 
 pub fn draw_wm(
@@ -152,7 +181,13 @@ pub fn draw_wm(
     }
 
     input::input(
-        pixmap, font_system, swash_cache, pad, 6.0, inner_w, header_h,
+        pixmap,
+        font_system,
+        swash_cache,
+        pad,
+        6.0,
+        inner_w,
+        header_h,
         &input::InputProps {
             value: &state.filter,
             cursor_at: state.filter.len(),
@@ -228,24 +263,82 @@ pub fn draw_wm(
     let _ = sel;
 
     draw_preview_rows(
-        pixmap, font_system, swash_cache,
-        pad, list_y, inner_w, list_h,
-        mouse_y, &rows, &mut state.list_state,
-        font_size, font_family, &list_colors, preview_size, &preview_colors,
+        pixmap,
+        font_system,
+        swash_cache,
+        pad,
+        list_y,
+        inner_w,
+        list_h,
+        mouse_y,
+        &rows,
+        &mut state.list_state,
+        font_size,
+        font_family,
+        &list_colors,
+        preview_size,
+        &preview_colors,
     );
 
     let hint_y = h - footer_h + 4.0;
-    let hint_text = format!("{} ({} ops)", compositor_name(state.compositor), list_len);
+
+    let mut badge_x = pad;
+    if let Some(item) = state.selected() {
+        let border_outline = Color::from_rgba8(255, 255, 255, 40);
+        let badge_colors = BadgeColors {
+            bg: Color::from_rgba8(0, 0, 0, 0),
+            fg: desc_fg,
+            border: Some(border_outline),
+        };
+        let (bw, _) = badge(
+            pixmap,
+            font_system,
+            swash_cache,
+            badge_x,
+            hint_y + 2.0,
+            &BadgeProps {
+                text: &item.category,
+                variant: BadgeVariant::Outline,
+                focused: false,
+                colors: Some(badge_colors),
+                icon: None,
+                lucide_icon: wm_category_icon(&item.category),
+            },
+            font_family,
+        );
+        badge_x += bw + 6.0;
+    }
+
     if state.monitor_count > 0 || !state.workspaces.is_empty() {
-        let detail = format!("{} workspaces · {} monitors", state.workspaces.len(), state.monitor_count);
+        let detail = format!(
+            "{} workspaces · {} monitors",
+            state.workspaces.len(),
+            state.monitor_count
+        );
         draw::draw_text(
-            pixmap, font_system, swash_cache,
-            &detail, pad, hint_y + 4.0, 11.0, font_family, dim_fg,
+            pixmap,
+            font_system,
+            swash_cache,
+            &detail,
+            badge_x,
+            hint_y + 4.0,
+            11.0,
+            font_family,
+            dim_fg,
         );
     }
+
+    let hint_text = format!("{} ({} ops)", compositor_name(state.compositor), list_len);
     let hint_w = draw::text_width(font_system, &hint_text, 11.0, font_family);
     draw::draw_text(
-        pixmap, font_system, swash_cache,
-        &hint_text, w - pad - hint_w, hint_y + 4.0, 11.0, font_family, dim_fg,
+        pixmap,
+        font_system,
+        swash_cache,
+        &hint_text,
+        w - pad - hint_w,
+        hint_y + 4.0,
+        11.0,
+        font_family,
+        dim_fg,
     );
 }

@@ -3,9 +3,11 @@ use tiny_skia::{Color, Pixmap};
 use wisp::draw::{self, color_from_hex};
 use wisp::events::MouseDispatcher;
 use wisp::input::InputAction;
+use wisp_components::badge::{badge, BadgeProps, BadgeVariant};
 use wisp_components::input;
 use wisp_components::kbd_combo::{kbd_combo, measure_kbd_combo, KbdComboProps};
 use wisp_components::list_view::ListState;
+use wisp_components::Icon;
 
 use crate::data::{ShortcutCategory, ShortcutEntry};
 
@@ -57,7 +59,11 @@ impl HelpState {
     pub fn rebuild_rows(&mut self) {
         let mut rows = Vec::new();
         for cat in &self.categories {
-            let entries: Vec<&ShortcutEntry> = cat.entries.iter().filter(|e| e.matches(&self.filter)).collect();
+            let entries: Vec<&ShortcutEntry> = cat
+                .entries
+                .iter()
+                .filter(|e| e.matches(&self.filter))
+                .collect();
             if entries.is_empty() {
                 continue;
             }
@@ -118,6 +124,16 @@ pub fn handle_action(state: &mut HelpState, action: InputAction) {
 }
 
 #[allow(clippy::too_many_arguments)]
+fn help_section_icon(section: &str) -> Option<Icon> {
+    Some(match section {
+        "Global" => Icon::Keyboard,
+        "Custom Apps" => Icon::AppWindow,
+        "Snippets" => Icon::FileText,
+        "General" => Icon::Info,
+        _ => return None,
+    })
+}
+
 pub fn draw_help(
     pixmap: &mut Pixmap,
     font_system: &mut cosmic_text::FontSystem,
@@ -149,7 +165,13 @@ pub fn draw_help(
     }
 
     input::input(
-        pixmap, font_system, swash_cache, pad, 6.0, inner_w, HELP_HEADER_H,
+        pixmap,
+        font_system,
+        swash_cache,
+        pad,
+        6.0,
+        inner_w,
+        HELP_HEADER_H,
         &input::InputProps {
             value: &state.filter,
             cursor_at: state.filter.len(),
@@ -199,8 +221,15 @@ pub fn draw_help(
         };
         let ew = draw::text_width(font_system, empty, 12.0, font_family);
         draw::draw_text(
-            pixmap, font_system, swash_cache,
-            empty, (w - ew) / 2.0, list_y + list_h / 2.0 - 6.0, 12.0, font_family, desc_fg,
+            pixmap,
+            font_system,
+            swash_cache,
+            empty,
+            (w - ew) / 2.0,
+            list_y + list_h / 2.0 - 6.0,
+            12.0,
+            font_family,
+            desc_fg,
         );
     } else {
         let scroll_y = state.list_state.scroll.offset();
@@ -221,13 +250,36 @@ pub fn draw_help(
             match row.kind {
                 RowKind::Header => {
                     if y >= list_y - 4.0 && y + HELP_SECTION_HEADER_H <= list_y + list_h + 4.0 {
+                        let mut text_x = pad;
+                        if let Some(icon) = help_section_icon(&row.text) {
+                            wisp::lucide::draw_lucide_icon(
+                                pixmap,
+                                icon,
+                                text_x,
+                                y + 3.0,
+                                10.0,
+                                accent,
+                            );
+                            text_x += 14.0;
+                        }
                         draw::draw_text(
-                            pixmap, font_system, swash_cache,
-                            &row.text, pad, y + 4.0, 11.0, font_family, accent,
+                            pixmap,
+                            font_system,
+                            swash_cache,
+                            &row.text,
+                            text_x,
+                            y + 4.0,
+                            11.0,
+                            font_family,
+                            accent,
                         );
                         let line_y = y + HELP_SECTION_HEADER_H - 6.0;
                         draw::fill_rect(
-                            pixmap, pad, line_y, inner_w, 1.0,
+                            pixmap,
+                            pad,
+                            line_y,
+                            inner_w,
+                            1.0,
                             Color::from_rgba8(255, 255, 255, 25),
                         );
                     }
@@ -236,9 +288,17 @@ pub fn draw_help(
                     if let Some(entry) = &row.entry {
                         if y >= list_y && y + HELP_ROW_H <= list_y + list_h {
                             draw_entry_row(
-                                pixmap, font_system, swash_cache,
-                                pad, y, inner_w, HELP_ROW_H,
-                                entry, fg, desc_fg, font_family,
+                                pixmap,
+                                font_system,
+                                swash_cache,
+                                pad,
+                                y,
+                                inner_w,
+                                HELP_ROW_H,
+                                entry,
+                                fg,
+                                desc_fg,
+                                font_family,
                             );
                         }
                     }
@@ -258,18 +318,80 @@ pub fn draw_help(
             .iter()
             .filter(|r| r.kind == RowKind::Entry)
             .count();
-        format!("{entry_count} shortcut{}", if entry_count == 1 { "" } else { "s" })
+        format!(
+            "{entry_count} shortcut{}",
+            if entry_count == 1 { "" } else { "s" }
+        )
     };
     let cw = draw::text_width(font_system, &count, 11.0, font_family);
     draw::draw_text(
-        pixmap, font_system, swash_cache,
-        &count, pad, hint_y + 4.0, 11.0, font_family, desc_fg,
+        pixmap,
+        font_system,
+        swash_cache,
+        &count,
+        pad,
+        hint_y + 4.0,
+        11.0,
+        font_family,
+        desc_fg,
     );
-    let hint = "F1  open this view   Esc  close";
-    let hw = draw::text_width(font_system, hint, 11.0, font_family);
+    let mut hint_x = w - pad;
+    let close_text = "close";
+    let close_tw = draw::text_width(font_system, close_text, 11.0, font_family);
+    let close_text_x = hint_x - close_tw;
     draw::draw_text(
-        pixmap, font_system, swash_cache,
-        hint, w - pad - hw, hint_y + 4.0, 11.0, font_family, desc_fg,
+        pixmap,
+        font_system,
+        swash_cache,
+        close_text,
+        close_text_x,
+        hint_y + 4.0,
+        11.0,
+        font_family,
+        desc_fg,
+    );
+    hint_x = close_text_x - 2.0;
+    let (esc_bw, _) = badge(
+        pixmap,
+        font_system,
+        swash_cache,
+        hint_x - 6.0,
+        hint_y + 2.0,
+        &BadgeProps {
+            text: "Esc",
+            variant: BadgeVariant::Secondary,
+            ..Default::default()
+        },
+        font_family,
+    );
+    hint_x -= esc_bw + 8.0;
+    let open_text = "open this view";
+    let open_tw = draw::text_width(font_system, open_text, 11.0, font_family);
+    let open_text_x = hint_x - open_tw;
+    draw::draw_text(
+        pixmap,
+        font_system,
+        swash_cache,
+        open_text,
+        open_text_x,
+        hint_y + 4.0,
+        11.0,
+        font_family,
+        desc_fg,
+    );
+    hint_x = open_text_x - 2.0;
+    let (_f1_bw, _) = badge(
+        pixmap,
+        font_system,
+        swash_cache,
+        hint_x - 6.0,
+        hint_y + 2.0,
+        &BadgeProps {
+            text: "F1",
+            variant: BadgeVariant::Secondary,
+            ..Default::default()
+        },
+        font_family,
     );
     let _ = (cw, accent, border);
 }
@@ -288,8 +410,15 @@ fn draw_entry_row(
     font_family: &str,
 ) {
     draw::draw_text(
-        pixmap, font_system, swash_cache,
-        &entry.description, x + 2.0, y + 6.0, 12.0, font_family, fg,
+        pixmap,
+        font_system,
+        swash_cache,
+        &entry.description,
+        x + 2.0,
+        y + 6.0,
+        12.0,
+        font_family,
+        fg,
     );
 
     let kbd_text = if entry.keys_display.is_empty() {
@@ -306,8 +435,11 @@ fn draw_entry_row(
     let combo_w = measure_kbd_combo(font_system, &props, font_family);
     let combo_x = x + w - 1.0 - combo_w;
     let (kbd_w, _kbd_h) = kbd_combo(
-        pixmap, font_system, swash_cache,
-        combo_x, y + 4.0,
+        pixmap,
+        font_system,
+        swash_cache,
+        combo_x,
+        y + 4.0,
         &props,
         font_family,
     );

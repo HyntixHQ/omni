@@ -2,6 +2,7 @@ use tiny_skia::{Color, Pixmap};
 use wisp::events::MouseDispatcher;
 use wisp::CursorStyle;
 use wisp_components::list_view::{self, ListColors, ListItem, ListState};
+use wisp_components::Icon;
 
 pub const CLIPBOARD_WIDTH: i32 = 400;
 pub const CLIPBOARD_HEIGHT: i32 = 340;
@@ -137,7 +138,13 @@ pub fn draw_clipboard(
 
     // Search input
     wisp_components::input::input(
-        pixmap, font_system, swash_cache, pad, 6.0, inner_w, 42.0,
+        pixmap,
+        font_system,
+        swash_cache,
+        pad,
+        6.0,
+        inner_w,
+        42.0,
         &wisp_components::input::InputProps {
             value: &state.filter,
             cursor_at: state.filter.len(),
@@ -172,7 +179,12 @@ pub fn draw_clipboard(
     let list_h = h - list_y - footer_h - pad;
 
     state.mouse.clear();
-    state.mouse.register(wisp::events::RegionId::Body, list_y, list_h, CursorStyle::PointingHand);
+    state.mouse.register(
+        wisp::events::RegionId::Body,
+        list_y,
+        list_h,
+        CursorStyle::PointingHand,
+    );
     let row_h = list_view::row_height_compact(font_system, font_size, font_family);
     let filtered = state.filtered();
     let list_len = filtered.len();
@@ -197,8 +209,13 @@ pub fn draw_clipboard(
     list_state.ensure_selected_visible(row_h);
 
     list_view::draw_list(
-        pixmap, font_system, swash_cache,
-        pad, list_y, inner_w, list_h,
+        pixmap,
+        font_system,
+        swash_cache,
+        pad,
+        list_y,
+        inner_w,
+        list_h,
         mouse_y,
         &list_items,
         &mut state.list_state,
@@ -210,35 +227,60 @@ pub fn draw_clipboard(
     // Footer hint
     let hint_y = h - footer_h + 4.0;
     wisp_components::badge::badge(
-        pixmap, font_system, swash_cache, pad, hint_y,
+        pixmap,
+        font_system,
+        swash_cache,
+        pad,
+        hint_y,
         &wisp_components::badge::BadgeProps {
             text: "Esc",
             variant: wisp_components::badge::BadgeVariant::Secondary,
+            lucide_icon: Some(Icon::X),
             ..Default::default()
         },
         font_family,
     );
     let badge_w = wisp_components::badge::badge_size("Esc", font_system, font_family);
     wisp::draw::draw_text(
-        pixmap, font_system, swash_cache,
-        "to close", pad + badge_w + 6.0, hint_y + 4.0, 11.0, font_family, list_colors.desc_fg,
+        pixmap,
+        font_system,
+        swash_cache,
+        "to close",
+        pad + badge_w + 6.0,
+        hint_y + 4.0,
+        11.0,
+        font_family,
+        list_colors.desc_fg,
     );
 
     // Enter badge
     let enter_w = wisp_components::badge::badge_size("Enter", font_system, font_family);
     let enter_x = w - pad - enter_w;
     wisp_components::badge::badge(
-        pixmap, font_system, swash_cache, enter_x, hint_y,
+        pixmap,
+        font_system,
+        swash_cache,
+        enter_x,
+        hint_y,
         &wisp_components::badge::BadgeProps {
             text: "Enter",
             variant: wisp_components::badge::BadgeVariant::Secondary,
+            lucide_icon: Some(Icon::CornerDownLeft),
             ..Default::default()
         },
         font_family,
     );
-    let confirm_label_x = enter_x - 6.0 - wisp::draw::text_width(font_system, "to paste", 11.0, font_family);
+    let confirm_label_x =
+        enter_x - 6.0 - wisp::draw::text_width(font_system, "to paste", 11.0, font_family);
     wisp::draw::draw_text(
-        pixmap, font_system, swash_cache,
-        "to paste", confirm_label_x, hint_y + 4.0, 11.0, font_family, list_colors.desc_fg,
+        pixmap,
+        font_system,
+        swash_cache,
+        "to paste",
+        confirm_label_x,
+        hint_y + 4.0,
+        11.0,
+        font_family,
+        list_colors.desc_fg,
     );
 }

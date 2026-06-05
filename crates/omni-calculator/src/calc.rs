@@ -1,5 +1,6 @@
 use tiny_skia::Pixmap;
 use wisp::draw;
+use wisp_components::Icon;
 
 pub const CALC_WIDTH: i32 = 360;
 pub const CALC_HEIGHT: i32 = 220;
@@ -110,7 +111,11 @@ pub fn draw_calculator(
     // Label above input
     let label_y = 14.0;
     wisp_components::label::label(
-        pixmap, font_system, swash_cache, pad, label_y,
+        pixmap,
+        font_system,
+        swash_cache,
+        pad,
+        label_y,
         &wisp_components::label::LabelProps {
             text: "Expression",
             font_size: 14.0,
@@ -122,7 +127,13 @@ pub fn draw_calculator(
 
     // Input area
     wisp_components::input::input(
-        pixmap, font_system, swash_cache, pad, label_y + 22.0, inner_w, 42.0,
+        pixmap,
+        font_system,
+        swash_cache,
+        pad,
+        label_y + 22.0,
+        inner_w,
+        42.0,
         &wisp_components::input::InputProps {
             value: &state.expression,
             cursor_at: state.expression.len(),
@@ -155,21 +166,50 @@ pub fn draw_calculator(
     // Result / error
     let ry = label_y + 22.0 + 42.0 + 14.0;
     if let Some(ref err) = state.error {
-        draw::draw_text(pixmap, font_system, swash_cache, err, pad + 4.0, ry.round(), 13.0, font_family, error_color);
+        draw::draw_text(
+            pixmap,
+            font_system,
+            swash_cache,
+            err,
+            pad + 4.0,
+            ry.round(),
+            13.0,
+            font_family,
+            error_color,
+        );
     } else if let Some(ref res) = state.result {
         let text = format!("= {}", res);
         let rw = draw::text_width(font_system, &text, 24.0, font_family);
-        let rx = if rw > inner_w { pad + 4.0 } else { w - pad - rw };
-        draw::draw_text(pixmap, font_system, swash_cache, &text, rx.round(), ry.round(), 24.0, font_family, fg);
+        let rx = if rw > inner_w {
+            pad + 4.0
+        } else {
+            w - pad - rw
+        };
+        draw::draw_text(
+            pixmap,
+            font_system,
+            swash_cache,
+            &text,
+            rx.round(),
+            ry.round(),
+            24.0,
+            font_family,
+            fg,
+        );
     }
 
     // Footer hint — Badge "Esc" + label "to return"
     let hint_y = h - 28.0;
     wisp_components::badge::badge(
-        pixmap, font_system, swash_cache, pad, hint_y,
+        pixmap,
+        font_system,
+        swash_cache,
+        pad,
+        hint_y,
         &wisp_components::badge::BadgeProps {
             text: "Esc",
             variant: wisp_components::badge::BadgeVariant::Secondary,
+            lucide_icon: Some(Icon::X),
             ..Default::default()
         },
         font_family,
@@ -177,7 +217,14 @@ pub fn draw_calculator(
     let badge_w = wisp_components::badge::badge_size("Esc", font_system, font_family);
     let label_x = pad + badge_w + 6.0;
     draw::draw_text(
-        pixmap, font_system, swash_cache,
-        "to return", label_x, hint_y + 4.0, 11.0, font_family, dim_color,
+        pixmap,
+        font_system,
+        swash_cache,
+        "to return",
+        label_x,
+        hint_y + 4.0,
+        11.0,
+        font_family,
+        dim_color,
     );
 }
