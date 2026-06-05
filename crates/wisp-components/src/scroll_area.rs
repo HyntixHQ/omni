@@ -46,5 +46,13 @@ pub fn scrollbar(
     let thumb_y = y + scroll_ratio * (viewport_h - thumb_h);
     let thumb_x = x + (thumb_width - 4.0) / 2.0;
 
-    draw::fill_rounded_rect(pixmap, thumb_x, thumb_y, 4.0, thumb_h, [2.0; 4], colors.thumb);
+    draw::fill_rounded_rect(
+        pixmap,
+        thumb_x,
+        thumb_y,
+        4.0,
+        thumb_h,
+        [2.0; 4],
+        colors.thumb,
+    );
 }

@@ -23,3 +23,5 @@ libc.workspace = true
 memmap2.workspace = true
 tracing.workspace = true
 unicode-segmentation = "1"
+lucide-icons.workspace = true
+ab_glyph.workspace = true

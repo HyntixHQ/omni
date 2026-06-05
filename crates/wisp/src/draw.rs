@@ -28,7 +28,13 @@ pub fn fill_rounded_rect(
         let mut paint = Paint::default();
         paint.set_color(color);
         paint.anti_alias = true;
-        pixmap.fill_path(&path, &paint, tiny_skia::FillRule::Winding, Transform::identity(), None);
+        pixmap.fill_path(
+            &path,
+            &paint,
+            tiny_skia::FillRule::Winding,
+            Transform::identity(),
+            None,
+        );
     }
 }
 
@@ -69,7 +75,15 @@ fn build_rounded_rect_path(x: f32, y: f32, w: f32, h: f32, r: f32) -> Option<tin
     pb.finish()
 }
 
-pub fn stroke_rect(pixmap: &mut Pixmap, x: f32, y: f32, w: f32, h: f32, color: Color, stroke_width: f32) {
+pub fn stroke_rect(
+    pixmap: &mut Pixmap,
+    x: f32,
+    y: f32,
+    w: f32,
+    h: f32,
+    color: Color,
+    stroke_width: f32,
+) {
     let mut paint = Paint::default();
     paint.set_color(color);
     paint.anti_alias = true;
@@ -126,43 +140,62 @@ pub fn draw_text(
     use cosmic_text::Color as CtColor;
 
     let attrs = cosmic_text::Attrs::new().family(cosmic_text::Family::Name(font_family));
-    let mut buffer = cosmic_text::Buffer::new(font_system, cosmic_text::Metrics::new(font_size, font_size));
+    let mut buffer =
+        cosmic_text::Buffer::new(font_system, cosmic_text::Metrics::new(font_size, font_size));
     buffer.set_text(font_system, text, attrs, cosmic_text::Shaping::Advanced);
-    buffer.set_size(font_system, Some(pixmap.width() as f32), Some(pixmap.height() as f32));
+    buffer.set_size(
+        font_system,
+        Some(pixmap.width() as f32),
+        Some(pixmap.height() as f32),
+    );
 
     let red = (color.red() * 255.0) as u8;
     let green = (color.green() * 255.0) as u8;
     let blue = (color.blue() * 255.0) as u8;
     let alpha = (color.alpha() * 255.0) as u8;
 
-    buffer.draw(font_system, swash_cache, CtColor::rgba(red, green, blue, alpha), |draw_x, draw_y, _w, _h, pixel| {
-        let pixel_val: u32 = pixel.0;
-        if pixel_val > 0 {
-            let px = draw_x + x as i32;
-            let py = draw_y + y as i32;
-            if px >= 0 && px < pixmap.width() as i32 && py >= 0 && py < pixmap.height() as i32 {
-                let idx = (py as u32 * pixmap.width() + px as u32) as usize * 4;
-                let src_alpha = (pixel_val >> 24) & 0xFF;
-                let src_r = (pixel_val >> 16) & 0xFF;
-                let src_g = (pixel_val >> 8) & 0xFF;
-                let src_b = pixel_val & 0xFF;
-                let blend = src_alpha as f32 / 255.0;
-                if idx + 3 < pixmap.data().len() {
-                    let data = pixmap.data_mut();
-                    data[idx] = (data[idx] as f32 * (1.0 - blend) + src_r as f32 * blend) as u8;
-                    data[idx + 1] = (data[idx + 1] as f32 * (1.0 - blend) + src_g as f32 * blend) as u8;
-                    data[idx + 2] = (data[idx + 2] as f32 * (1.0 - blend) + src_b as f32 * blend) as u8;
-                    data[idx + 3] = (data[idx + 3] as f32 * (1.0 - blend) + alpha as f32 * blend) as u8;
+    buffer.draw(
+        font_system,
+        swash_cache,
+        CtColor::rgba(red, green, blue, alpha),
+        |draw_x, draw_y, _w, _h, pixel| {
+            let pixel_val: u32 = pixel.0;
+            if pixel_val > 0 {
+                let px = draw_x + x as i32;
+                let py = draw_y + y as i32;
+                if px >= 0 && px < pixmap.width() as i32 && py >= 0 && py < pixmap.height() as i32 {
+                    let idx = (py as u32 * pixmap.width() + px as u32) as usize * 4;
+                    let src_alpha = (pixel_val >> 24) & 0xFF;
+                    let src_r = (pixel_val >> 16) & 0xFF;
+                    let src_g = (pixel_val >> 8) & 0xFF;
+                    let src_b = pixel_val & 0xFF;
+                    let blend = src_alpha as f32 / 255.0;
+                    if idx + 3 < pixmap.data().len() {
+                        let data = pixmap.data_mut();
+                        data[idx] = (data[idx] as f32 * (1.0 - blend) + src_r as f32 * blend) as u8;
+                        data[idx + 1] =
+                            (data[idx + 1] as f32 * (1.0 - blend) + src_g as f32 * blend) as u8;
+                        data[idx + 2] =
+                            (data[idx + 2] as f32 * (1.0 - blend) + src_b as f32 * blend) as u8;
+                        data[idx + 3] =
+                            (data[idx + 3] as f32 * (1.0 - blend) + alpha as f32 * blend) as u8;
+                    }
                 }
             }
-        }
-    });
+        },
+    );
     y + font_size
 }
 
-pub fn text_width(font_system: &mut cosmic_text::FontSystem, text: &str, font_size: f32, font_family: &str) -> f32 {
+pub fn text_width(
+    font_system: &mut cosmic_text::FontSystem,
+    text: &str,
+    font_size: f32,
+    font_family: &str,
+) -> f32 {
     let attrs = cosmic_text::Attrs::new().family(cosmic_text::Family::Name(font_family));
-    let mut buffer = cosmic_text::Buffer::new(font_system, cosmic_text::Metrics::new(font_size, font_size));
+    let mut buffer =
+        cosmic_text::Buffer::new(font_system, cosmic_text::Metrics::new(font_size, font_size));
     buffer.set_text(font_system, text, attrs, cosmic_text::Shaping::Advanced);
     buffer.shape_until_scroll(font_system, true);
     buffer.lines.iter().fold(0.0f32, |max, line| {
@@ -247,50 +280,72 @@ pub fn draw_text_clipped(
     };
 
     let attrs = cosmic_text::Attrs::new().family(cosmic_text::Family::Name(font_family));
-    let mut buffer = cosmic_text::Buffer::new(font_system, cosmic_text::Metrics::new(font_size, font_size));
-    buffer.set_text(font_system, &display_text, attrs, cosmic_text::Shaping::Advanced);
-    buffer.set_size(font_system, Some(pixmap.width() as f32), Some(pixmap.height() as f32));
+    let mut buffer =
+        cosmic_text::Buffer::new(font_system, cosmic_text::Metrics::new(font_size, font_size));
+    buffer.set_text(
+        font_system,
+        &display_text,
+        attrs,
+        cosmic_text::Shaping::Advanced,
+    );
+    buffer.set_size(
+        font_system,
+        Some(pixmap.width() as f32),
+        Some(pixmap.height() as f32),
+    );
     buffer.set_wrap(font_system, cosmic_text::Wrap::None);
 
     let text_left = x;
-    let text_right = if max_w > 0.0 { x + max_w } else { pixmap.width() as f32 };
+    let text_right = if max_w > 0.0 {
+        x + max_w
+    } else {
+        pixmap.width() as f32
+    };
 
     let red = (color.red() * 255.0) as u8;
     let green = (color.green() * 255.0) as u8;
     let blue = (color.blue() * 255.0) as u8;
     let alpha = (color.alpha() * 255.0) as u8;
 
-    buffer.draw(font_system, swash_cache, CtColor::rgba(red, green, blue, alpha), |draw_x, draw_y, _w, _h, pixel| {
-        let pixel_val: u32 = pixel.0;
-        if pixel_val > 0 {
-            let px = draw_x + x as i32;
-            let py = draw_y + y as i32;
-            if py < 0 || (py as f32) < min_y || (py as f32) >= max_y {
-                return;
+    buffer.draw(
+        font_system,
+        swash_cache,
+        CtColor::rgba(red, green, blue, alpha),
+        |draw_x, draw_y, _w, _h, pixel| {
+            let pixel_val: u32 = pixel.0;
+            if pixel_val > 0 {
+                let px = draw_x + x as i32;
+                let py = draw_y + y as i32;
+                if py < 0 || (py as f32) < min_y || (py as f32) >= max_y {
+                    return;
+                }
+                // Horizontal clipping at max_w boundary
+                let px_f = draw_x as f32 + x;
+                if px_f < text_left || px_f >= text_right {
+                    return;
+                }
+                if px < 0 || px >= pixmap.width() as i32 {
+                    return;
+                }
+                let idx = (py as u32 * pixmap.width() + px as u32) as usize * 4;
+                let src_alpha = (pixel_val >> 24) & 0xFF;
+                let src_r = (pixel_val >> 16) & 0xFF;
+                let src_g = (pixel_val >> 8) & 0xFF;
+                let src_b = pixel_val & 0xFF;
+                let blend = src_alpha as f32 / 255.0;
+                if idx + 3 < pixmap.data().len() {
+                    let data = pixmap.data_mut();
+                    data[idx] = (data[idx] as f32 * (1.0 - blend) + src_r as f32 * blend) as u8;
+                    data[idx + 1] =
+                        (data[idx + 1] as f32 * (1.0 - blend) + src_g as f32 * blend) as u8;
+                    data[idx + 2] =
+                        (data[idx + 2] as f32 * (1.0 - blend) + src_b as f32 * blend) as u8;
+                    data[idx + 3] =
+                        (data[idx + 3] as f32 * (1.0 - blend) + alpha as f32 * blend) as u8;
+                }
             }
-            // Horizontal clipping at max_w boundary
-            let px_f = draw_x as f32 + x;
-            if px_f < text_left || px_f >= text_right {
-                return;
-            }
-            if px < 0 || px >= pixmap.width() as i32 {
-                return;
-            }
-            let idx = (py as u32 * pixmap.width() + px as u32) as usize * 4;
-            let src_alpha = (pixel_val >> 24) & 0xFF;
-            let src_r = (pixel_val >> 16) & 0xFF;
-            let src_g = (pixel_val >> 8) & 0xFF;
-            let src_b = pixel_val & 0xFF;
-            let blend = src_alpha as f32 / 255.0;
-            if idx + 3 < pixmap.data().len() {
-                let data = pixmap.data_mut();
-                data[idx] = (data[idx] as f32 * (1.0 - blend) + src_r as f32 * blend) as u8;
-                data[idx + 1] = (data[idx + 1] as f32 * (1.0 - blend) + src_g as f32 * blend) as u8;
-                data[idx + 2] = (data[idx + 2] as f32 * (1.0 - blend) + src_b as f32 * blend) as u8;
-                data[idx + 3] = (data[idx + 3] as f32 * (1.0 - blend) + alpha as f32 * blend) as u8;
-            }
-        }
-    });
+        },
+    );
 }
 
 /// Draw a pixmap (icon) clipped to a vertical range [min_y, max_y).
@@ -385,7 +440,13 @@ pub fn fill_rect_clipped(
         let mut paint = Paint::default();
         paint.set_color(color);
         paint.anti_alias = true;
-        pixmap.fill_path(&path, &paint, tiny_skia::FillRule::Winding, Transform::identity(), None);
+        pixmap.fill_path(
+            &path,
+            &paint,
+            tiny_skia::FillRule::Winding,
+            Transform::identity(),
+            None,
+        );
     }
 }
 

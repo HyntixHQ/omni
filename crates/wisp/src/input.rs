@@ -266,7 +266,13 @@ impl Default for WispInput {
     }
 }
 
-fn translate_sym(sym: xkb::Keysym, ctrl: bool, shift: bool, _alt: bool, _super: bool) -> InputAction {
+fn translate_sym(
+    sym: xkb::Keysym,
+    ctrl: bool,
+    shift: bool,
+    _alt: bool,
+    _super: bool,
+) -> InputAction {
     use xkb::Keysym;
     // Clipboard actions (Ctrl+C, Ctrl+X, Ctrl+V, Ctrl+A)
     if ctrl {

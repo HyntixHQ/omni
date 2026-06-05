@@ -99,7 +99,9 @@ impl CursorManager {
         theme_name: &str,
         size: u32,
     ) -> Self {
-        unsafe { std::env::set_var("XCURSOR_THEME", theme_name); }
+        unsafe {
+            std::env::set_var("XCURSOR_THEME", theme_name);
+        }
         let theme = wayland_cursor::CursorTheme::load(conn, shm.clone(), size).ok();
         Self {
             theme,

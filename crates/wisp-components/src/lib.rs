@@ -17,6 +17,7 @@ pub use kbd::{kbd, measure_kbd, KbdProps};
 pub use kbd_combo::{kbd_combo, measure_kbd_combo, KbdComboProps};
 pub use label::{label, LabelProps};
 pub use list_view::{draw_list, row_height, row_height_compact, ListColors, ListItem, ListState};
+pub use lucide_icons::Icon;
 pub use preview_row::{draw_preview_rows, preview_row_height, PreviewRow, PreviewRowSize};
 pub use scroll_area::{scrollbar, ScrollBarColors};
 pub use separator::{h_separator, separator, v_separator, SeparatorOrientation, SeparatorProps};

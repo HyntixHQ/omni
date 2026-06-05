@@ -61,8 +61,12 @@ impl WispSurface {
         buffer: wl_buffer::WlBuffer,
         mmap: MmapMut,
     ) {
-        if let Some(old) = self.buffer.take() { std::mem::forget(old); }
-        if let Some(old) = self.pool.take() { std::mem::forget(old); }
+        if let Some(old) = self.buffer.take() {
+            std::mem::forget(old);
+        }
+        if let Some(old) = self.pool.take() {
+            std::mem::forget(old);
+        }
         self.pool = Some(pool);
         self.buffer = Some(buffer);
         self.mmap = Some(mmap);
@@ -88,10 +92,7 @@ impl WispSurface {
         self.layer_surface.set_margin(top, right, bottom, left);
     }
 
-    pub fn set_keyboard_interactivity(
-        &self,
-        mode: zwlr_layer_surface_v1::KeyboardInteractivity,
-    ) {
+    pub fn set_keyboard_interactivity(&self, mode: zwlr_layer_surface_v1::KeyboardInteractivity) {
         self.layer_surface.set_keyboard_interactivity(mode);
     }
 
@@ -103,12 +104,7 @@ impl WispSurface {
         self.layer_surface.ack_configure(serial);
     }
 
-    pub fn configure(
-        &mut self,
-        serial: u32,
-        width: u32,
-        height: u32,
-    ) {
+    pub fn configure(&mut self, serial: u32, width: u32, height: u32) {
         if width > 0 && height > 0 {
             self.width = width as i32;
             self.height = height as i32;

@@ -1,7 +1,7 @@
+use cosmic_text::{FontSystem, SwashCache};
 use tiny_skia::Pixmap;
 use wisp::draw::{self, color_from_hex};
-use wisp_components::list_view::{draw_list, ListItem, ListColors};
-use cosmic_text::{FontSystem, SwashCache};
+use wisp_components::list_view::{draw_list, ListColors, ListItem};
 
 use crate::config::Config;
 use crate::state::OmniApp;
@@ -50,12 +50,22 @@ pub fn draw_launcher_frame(
 
     app.mouse.clear();
     app.mouse.register(
-        wisp::events::RegionId::Header, header_y, header_h,
+        wisp::events::RegionId::Header,
+        header_y,
+        header_h,
         wisp::CursorStyle::IBeam,
     );
     draw_search_input(
-        pixmap, font_system, swash_cache, app, cfg, cursor_visible,
-        PADDING, header_y, inner_w, header_h,
+        pixmap,
+        font_system,
+        swash_cache,
+        app,
+        cfg,
+        cursor_visible,
+        PADDING,
+        header_y,
+        inner_w,
+        header_h,
     );
 
     // Body / list area
@@ -63,13 +73,19 @@ pub fn draw_launcher_frame(
     let footer_top = h - PADDING - FOOTER_HEIGHT - 8.0;
     let body_h = (footer_top - body_y).max(0.0);
     app.mouse.register(
-        wisp::events::RegionId::Body, body_y, body_h,
+        wisp::events::RegionId::Body,
+        body_y,
+        body_h,
         wisp::CursorStyle::PointingHand,
     );
 
     // Pre-load icons
     for result in &app.results {
-        let icon_name = result.entry.icon.as_deref().unwrap_or("application-x-executable");
+        let icon_name = result
+            .entry
+            .icon
+            .as_deref()
+            .unwrap_or("application-x-executable");
         app.icon_cache.get_icon(icon_name);
     }
 
@@ -99,7 +115,11 @@ pub fn draw_launcher_frame(
         .iter()
         .enumerate()
         .map(|(i, result)| {
-            let icon_name = result.entry.icon.as_deref().unwrap_or("application-x-executable");
+            let icon_name = result
+                .entry
+                .icon
+                .as_deref()
+                .unwrap_or("application-x-executable");
             ListItem {
                 title: &result.entry.name,
                 subtitle: result.entry.description.as_deref(),
@@ -112,10 +132,19 @@ pub fn draw_launcher_frame(
         .collect();
 
     draw_list(
-        pixmap, font_system, swash_cache,
-        PADDING, body_y, inner_w, body_h, mouse_y,
-        &list_items, &mut app.list_state,
-        font_size, font_family, &list_colors,
+        pixmap,
+        font_system,
+        swash_cache,
+        PADDING,
+        body_y,
+        inner_w,
+        body_h,
+        mouse_y,
+        &list_items,
+        &mut app.list_state,
+        font_size,
+        font_family,
+        &list_colors,
     );
 
     // Footer / keyboard shortcuts
@@ -137,7 +166,10 @@ fn draw_launcher_footer(
     // Divider line above footer
     let divider_y = window_h - padding - footer_h - 8.0;
     wisp_components::separator::separator(
-        pixmap, 0.0, divider_y, window_w,
+        pixmap,
+        0.0,
+        divider_y,
+        window_w,
         &wisp_components::separator::SeparatorProps {
             color: color_from_hex(&cfg.theme.border),
             ..Default::default()
@@ -148,34 +180,110 @@ fn draw_launcher_footer(
     let footer_y = window_h - padding - footer_h;
     let badge_y = footer_y + (footer_h - 20.0) / 2.0; // badge height = 20px
 
-    let shortcuts_left = [
-        ("\u{2191}\u{2193}", "Navigate", wisp_components::badge::BadgeVariant::Secondary),
-        ("\u{23CE}", "Launch", wisp_components::badge::BadgeVariant::Secondary),
-        ("F1", "Shortcuts", wisp_components::badge::BadgeVariant::Secondary),
-    ];
-
     let mut cx = padding;
 
-    for (key, label, variant) in &shortcuts_left {
+    // ↑↓ Navigate — Lucide icon badge
+    {
         let (bw, _) = wisp_components::badge::badge(
-            pixmap, font_system, swash_cache, cx, badge_y,
+            pixmap,
+            font_system,
+            swash_cache,
+            cx,
+            badge_y,
             &wisp_components::badge::BadgeProps {
-                text: key,
-                variant: *variant,
+                text: "",
+                lucide_icon: Some(wisp_components::Icon::ArrowUpDown),
+                variant: wisp_components::badge::BadgeVariant::Secondary,
                 ..Default::default()
             },
             &cfg.font.family,
         );
         cx += bw + gap;
-
-        let label_x = cx;
+        let label = "Navigate";
         draw::draw_text_clipped(
-            pixmap, font_system, swash_cache,
-            label_x, badge_y + 4.0, label, 11.0, &cfg.font.family,
+            pixmap,
+            font_system,
+            swash_cache,
+            cx,
+            badge_y + 4.0,
+            label,
+            11.0,
+            &cfg.font.family,
             color_from_hex(&cfg.theme.desc_fg),
-            0.0, window_h, 100.0,
+            0.0,
+            window_h,
+            100.0,
         );
         cx += draw::text_width(font_system, label, 11.0, &cfg.font.family) + gap * 2.0;
+    }
+
+    // ↵ Launch — Lucide icon badge
+    {
+        let (bw, _) = wisp_components::badge::badge(
+            pixmap,
+            font_system,
+            swash_cache,
+            cx,
+            badge_y,
+            &wisp_components::badge::BadgeProps {
+                text: "",
+                lucide_icon: Some(wisp_components::Icon::CornerDownLeft),
+                variant: wisp_components::badge::BadgeVariant::Secondary,
+                ..Default::default()
+            },
+            &cfg.font.family,
+        );
+        cx += bw + gap;
+        let label = "Launch";
+        draw::draw_text_clipped(
+            pixmap,
+            font_system,
+            swash_cache,
+            cx,
+            badge_y + 4.0,
+            label,
+            11.0,
+            &cfg.font.family,
+            color_from_hex(&cfg.theme.desc_fg),
+            0.0,
+            window_h,
+            100.0,
+        );
+        cx += draw::text_width(font_system, label, 11.0, &cfg.font.family) + gap * 2.0;
+    }
+
+    // F1 Shortcuts — text badge
+    {
+        let (bw, _) = wisp_components::badge::badge(
+            pixmap,
+            font_system,
+            swash_cache,
+            cx,
+            badge_y,
+            &wisp_components::badge::BadgeProps {
+                text: "F1",
+                variant: wisp_components::badge::BadgeVariant::Secondary,
+                ..Default::default()
+            },
+            &cfg.font.family,
+        );
+        cx += bw + gap;
+        let label = "Shortcuts";
+        draw::draw_text_clipped(
+            pixmap,
+            font_system,
+            swash_cache,
+            cx,
+            badge_y + 4.0,
+            label,
+            11.0,
+            &cfg.font.family,
+            color_from_hex(&cfg.theme.desc_fg),
+            0.0,
+            window_h,
+            100.0,
+        );
+        let _ = cx;
     }
 
     // Esc Quit — right-aligned
@@ -188,7 +296,11 @@ fn draw_launcher_footer(
     let quit_label_x = quit_badge_x + quit_badge_w + gap;
 
     wisp_components::badge::badge(
-        pixmap, font_system, swash_cache, quit_badge_x, badge_y,
+        pixmap,
+        font_system,
+        swash_cache,
+        quit_badge_x,
+        badge_y,
         &wisp_components::badge::BadgeProps {
             text: quit_key,
             variant: wisp_components::badge::BadgeVariant::Secondary,
@@ -197,10 +309,18 @@ fn draw_launcher_footer(
         &cfg.font.family,
     );
     draw::draw_text_clipped(
-        pixmap, font_system, swash_cache,
-        quit_label_x, badge_y + 4.0, quit_label, 11.0, &cfg.font.family,
+        pixmap,
+        font_system,
+        swash_cache,
+        quit_label_x,
+        badge_y + 4.0,
+        quit_label,
+        11.0,
+        &cfg.font.family,
         color_from_hex(&cfg.theme.desc_fg),
-        0.0, window_h, 100.0,
+        0.0,
+        window_h,
+        100.0,
     );
 }
 
@@ -217,7 +337,13 @@ fn draw_search_input(
     h: f32,
 ) {
     wisp_components::input::input(
-        pixmap, font_system, swash_cache, x, y, w, h,
+        pixmap,
+        font_system,
+        swash_cache,
+        x,
+        y,
+        w,
+        h,
         &wisp_components::input::InputProps {
             value: app.query(),
             cursor_at: app.cursor_at(),

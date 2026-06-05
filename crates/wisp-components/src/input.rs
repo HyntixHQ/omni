@@ -90,7 +90,11 @@ pub fn input(
     // Shadow (drawn before everything, behind the background)
     if props.shadow && !props.disabled {
         draw::fill_rounded_rect(
-            pixmap, x + 1.0, y + 2.0, w, h,
+            pixmap,
+            x + 1.0,
+            y + 2.0,
+            w,
+            h,
             [props.border_radius; 4],
             tiny_skia::Color::from_rgba8(0, 0, 0, 30),
         );
@@ -118,12 +122,27 @@ pub fn input(
             (props.ring_color.alpha() * 127.0) as u8,
         );
         draw::stroke_rounded_rect(
-            pixmap, x + 0.5, y + 0.5, w - 1.0, h - 1.0,
-            props.border_radius, r, props.ring_width,
+            pixmap,
+            x + 0.5,
+            y + 0.5,
+            w - 1.0,
+            h - 1.0,
+            props.border_radius,
+            r,
+            props.ring_width,
         );
     } else {
         let border = apply_opacity(props.border_color, opacity);
-        draw::stroke_rounded_rect(pixmap, x + 0.5, y + 0.5, w - 1.0, h - 1.0, props.border_radius, border, 1.0);
+        draw::stroke_rounded_rect(
+            pixmap,
+            x + 0.5,
+            y + 0.5,
+            w - 1.0,
+            h - 1.0,
+            props.border_radius,
+            border,
+            1.0,
+        );
     }
 
     // Text metrics
@@ -145,7 +164,9 @@ pub fn input(
         text_x += icon_size + props.gap;
     }
 
-    let max_text_w = w - (text_x - x) - padding_x
+    let max_text_w = w
+        - (text_x - x)
+        - padding_x
         - if props.suffix_icon.is_some() || props.cleanable || props.loading {
             icon_size + props.gap + padding_x
         } else {
@@ -157,7 +178,8 @@ pub fn input(
         if sel_start < sel_end {
             let before_sel = &props.value[..sel_start];
             let sel_text = &props.value[sel_start..sel_end];
-            let sel_x = text_x + draw::text_width(font_system, before_sel, props.font_size, props.font_family);
+            let sel_x = text_x
+                + draw::text_width(font_system, before_sel, props.font_size, props.font_family);
             let sel_w = draw::text_width(font_system, sel_text, props.font_size, props.font_family);
             draw::fill_rect(pixmap, sel_x, y + 2.0, sel_w, h - 4.0, props.selection_bg);
         }
@@ -166,26 +188,53 @@ pub fn input(
     // Text or placeholder
     if props.value.is_empty() {
         draw::draw_text_clipped(
-            pixmap, font_system, swash_cache,
-            text_x, text_y, props.placeholder, props.font_size, props.font_family,
-            placeholder_fg, y, y + h, max_text_w,
+            pixmap,
+            font_system,
+            swash_cache,
+            text_x,
+            text_y,
+            props.placeholder,
+            props.font_size,
+            props.font_family,
+            placeholder_fg,
+            y,
+            y + h,
+            max_text_w,
         );
         if props.cursor_visible && !props.disabled {
-            draw::fill_rect(pixmap, text_x, cursor_y, cursor_w, cursor_h, props.caret_color);
+            draw::fill_rect(
+                pixmap,
+                text_x,
+                cursor_y,
+                cursor_w,
+                cursor_h,
+                props.caret_color,
+            );
         }
     } else {
         draw::draw_text_clipped(
-            pixmap, font_system, swash_cache,
-            text_x, text_y, props.value, props.font_size, props.font_family,
-            fg, y, y + h, max_text_w,
+            pixmap,
+            font_system,
+            swash_cache,
+            text_x,
+            text_y,
+            props.value,
+            props.font_size,
+            props.font_family,
+            fg,
+            y,
+            y + h,
+            max_text_w,
         );
         if props.cursor_visible && !props.disabled {
-            let before: String = props.value
+            let before: String = props
+                .value
                 .grapheme_indices(true)
                 .take(props.cursor_at)
                 .map(|(_, s)| s)
                 .collect();
-            let cursor_offset = draw::text_width(font_system, &before, props.font_size, props.font_family);
+            let cursor_offset =
+                draw::text_width(font_system, &before, props.font_size, props.font_family);
             let mut cx = text_x + cursor_offset;
             // Clamp cursor to not go beyond right edge of input (matches GPUI)
             let right_limit = x + w - padding_x - cursor_w;
@@ -198,9 +247,8 @@ pub fn input(
 
     // Suffix area (clean button, loading spinner, suffix icon)
     let mut suffix_x = x + w - padding_x;
-    let suffix_items = props.suffix_icon.is_some() as u8
-        + props.cleanable as u8
-        + props.loading as u8;
+    let suffix_items =
+        props.suffix_icon.is_some() as u8 + props.cleanable as u8 + props.loading as u8;
     if suffix_items > 0 {
         // Draw from right to left
         // Suffix icon (rightmost)
@@ -220,14 +268,25 @@ pub fn input(
             let cy = icon_y + icon_size / 2.0;
             let r = icon_size / 2.0 - 1.0;
             draw::fill_rounded_rect(
-                pixmap, cx - r, cy - r, r * 2.0, r * 2.0,
+                pixmap,
+                cx - r,
+                cy - r,
+                r * 2.0,
+                r * 2.0,
                 [r.max(1.0); 4],
                 tiny_skia::Color::from_rgba8(163, 163, 163, 200),
             );
             // X lines
             let cross_offset = r * 0.4;
             let cross_color = tiny_skia::Color::from_rgba8(10, 10, 10, 255);
-            draw::fill_rect(pixmap, cx - cross_offset, cy - cross_offset, 2.0, 2.0, cross_color);
+            draw::fill_rect(
+                pixmap,
+                cx - cross_offset,
+                cy - cross_offset,
+                2.0,
+                2.0,
+                cross_color,
+            );
             suffix_x -= props.gap;
         }
 
@@ -239,10 +298,17 @@ pub fn input(
             let dot_color = tiny_skia::Color::from_rgba8(163, 163, 163, 200);
             for i in 0..3 {
                 let dx = suffix_x + icon_size / 2.0 + (i as f32 - 1.0) * 6.0;
-                draw::fill_rounded_rect(pixmap, dx - dot_r, dot_y - dot_r, dot_r * 2.0, dot_r * 2.0, [dot_r; 4], dot_color);
+                draw::fill_rounded_rect(
+                    pixmap,
+                    dx - dot_r,
+                    dot_y - dot_r,
+                    dot_r * 2.0,
+                    dot_r * 2.0,
+                    [dot_r; 4],
+                    dot_color,
+                );
             }
         }
-
     }
 
     y + h

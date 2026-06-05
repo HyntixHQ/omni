@@ -96,18 +96,57 @@ pub fn draw_preview_rows(
         let is_active = item.selected && colors.active_highlight;
 
         if item.selected || is_hovered {
-            let bg = if item.selected { colors.active_bg } else { colors.hover };
-            draw::fill_rect_clipped(pixmap, x, row_y, w, row_h_actual, 4.0, bg, row_y, row_y + row_h_actual);
+            let bg = if item.selected {
+                colors.active_bg
+            } else {
+                colors.hover
+            };
+            draw::fill_rect_clipped(
+                pixmap,
+                x,
+                row_y,
+                w,
+                row_h_actual,
+                4.0,
+                bg,
+                row_y,
+                row_y + row_h_actual,
+            );
         }
 
         if is_active && row_y >= y && row_bot <= y + h {
-            draw::stroke_rounded_rect(pixmap, x + 0.5, row_y + 0.5, w - 1.0, row_h_actual - 1.0, 4.0, colors.active_border, 1.0);
+            draw::stroke_rounded_rect(
+                pixmap,
+                x + 0.5,
+                row_y + 0.5,
+                w - 1.0,
+                row_h_actual - 1.0,
+                4.0,
+                colors.active_border,
+                1.0,
+            );
         }
 
-        let name_color = if item.selected { colors.selected_fg } else { colors.fg };
-        let desc_color = if item.selected { colors.selected_desc_fg } else { colors.desc_fg };
-        let name_color = if item.disabled { colors.desc_fg } else { name_color };
-        let desc_color = if item.disabled { colors.desc_fg } else { desc_color };
+        let name_color = if item.selected {
+            colors.selected_fg
+        } else {
+            colors.fg
+        };
+        let desc_color = if item.selected {
+            colors.selected_desc_fg
+        } else {
+            colors.desc_fg
+        };
+        let name_color = if item.disabled {
+            colors.desc_fg
+        } else {
+            name_color
+        };
+        let desc_color = if item.disabled {
+            colors.desc_fg
+        } else {
+            desc_color
+        };
         let preview_color = if item.disabled {
             Color::from_rgba8(100, 100, 100, 120)
         } else if item.selected {
@@ -117,35 +156,69 @@ pub fn draw_preview_rows(
         };
         let final_preview_colors = PreviewColors {
             accent: preview_color,
-            outline: if item.disabled { Color::from_rgba8(60, 60, 60, 200) } else { preview_colors.outline },
+            outline: if item.disabled {
+                Color::from_rgba8(60, 60, 60, 200)
+            } else {
+                preview_colors.outline
+            },
         };
 
         let name_y = row_y + name_y_offset;
         draw::draw_text_clipped(
-            pixmap, font_system, swash_cache,
-            x + padding_x, name_y, item.title, font_size, font_family, name_color,
-            name_y, name_y + name_h, text_max_w,
+            pixmap,
+            font_system,
+            swash_cache,
+            x + padding_x,
+            name_y,
+            item.title,
+            font_size,
+            font_family,
+            name_color,
+            name_y,
+            name_y + name_h,
+            text_max_w,
         );
 
         if let Some(desc) = item.subtitle {
             let desc_y = (name_y + name_h + 2.0).round();
             draw::draw_text_clipped(
-                pixmap, font_system, swash_cache,
-                x + padding_x, desc_y, desc, desc_size, font_family, desc_color,
-                desc_y, desc_y + desc_h, text_max_w,
+                pixmap,
+                font_system,
+                swash_cache,
+                x + padding_x,
+                desc_y,
+                desc,
+                desc_size,
+                font_family,
+                desc_color,
+                desc_y,
+                desc_y + desc_h,
+                text_max_w,
             );
         }
 
         if let Some(preview) = item.preview {
             let px = (x + w - padding_x - preview_size.preview_w).round();
             let py = (row_y + (row_h_actual - preview_size.preview_h) / 2.0).round();
-            draw_preview(pixmap, px, py, preview_size.preview_w, preview_size.preview_h, preview, &final_preview_colors);
+            draw_preview(
+                pixmap,
+                px,
+                py,
+                preview_size.preview_w,
+                preview_size.preview_h,
+                preview,
+                &final_preview_colors,
+            );
         }
     }
 }
 
 /// Compute row height for preview rows.
-pub fn preview_row_height(font_system: &mut cosmic_text::FontSystem, font_size: f32, font_family: &str) -> f32 {
+pub fn preview_row_height(
+    font_system: &mut cosmic_text::FontSystem,
+    font_size: f32,
+    font_family: &str,
+) -> f32 {
     let desc_size = font_size - 2.0;
     let (n_ascent, n_descent) = draw::text_metrics(font_system, "Ag", font_size, font_family);
     let (d_ascent, d_descent) = draw::text_metrics(font_system, "Ag", desc_size, font_family);

@@ -1,7 +1,7 @@
+use crate::list_view::{ListItem as LvItem, ListState};
 use tiny_skia::Pixmap;
 use wisp::draw;
 use wisp::draw::color_from_hex;
-use crate::list_view::{ListItem as LvItem, ListState};
 
 /// shadcn-style Command item data (displayed in the list).
 #[derive(Debug, Clone)]
@@ -77,15 +77,28 @@ pub fn command_palette(
     pixmap.fill(tiny_skia::Color::TRANSPARENT);
 
     // Window background + border
-    draw::fill_rounded_rect(pixmap, 0.0, 0.0, w, h, [props.border_radius; 4], props.colors.bg);
+    draw::fill_rounded_rect(
+        pixmap,
+        0.0,
+        0.0,
+        w,
+        h,
+        [props.border_radius; 4],
+        props.colors.bg,
+    );
     draw::stroke_rect(pixmap, 0.5, 0.5, w - 1.0, h - 1.0, props.colors.border, 1.0);
 
     // Header / search input
     let input_y = padding;
     let input_h = header_h;
     let _input_bottom = crate::input::input(
-        pixmap, font_system, swash_cache,
-        padding, input_y, w - padding * 2.0, input_h,
+        pixmap,
+        font_system,
+        swash_cache,
+        padding,
+        input_y,
+        w - padding * 2.0,
+        input_h,
         &crate::input::InputProps {
             value: props.query,
             cursor_at: props.cursor_at,
@@ -124,24 +137,34 @@ pub fn command_palette(
     let body_h = h - padding - footer_h - body_y - 8.0;
 
     // Convert CommandItems to ListItems
-    let list_items: Vec<LvItem> = props.items.iter().enumerate().map(|(i, item)| {
-        LvItem {
+    let list_items: Vec<LvItem> = props
+        .items
+        .iter()
+        .enumerate()
+        .map(|(i, item)| LvItem {
             title: item.title,
             subtitle: item.description,
             prefix_icon: item.icon,
             suffix_icon: None,
             selected: i == props.selected_index,
             disabled: false,
-        }
-    }).collect();
+        })
+        .collect();
 
     // Draw list
     crate::list_view::draw_list(
-        pixmap, font_system, swash_cache,
-        padding, body_y, w - padding * 2.0, body_h,
+        pixmap,
+        font_system,
+        swash_cache,
+        padding,
+        body_y,
+        w - padding * 2.0,
+        body_h,
         -1.0, // mouse_y: no hover tracking for command palette
-        &list_items, state,
-        props.font_size, props.font_family,
+        &list_items,
+        state,
+        props.font_size,
+        props.font_family,
         &crate::list_view::ListColors {
             bg: props.colors.bg,
             hover: tiny_skia::Color::from_rgba8(
@@ -164,7 +187,9 @@ pub fn command_palette(
     let total_h = props.items.len() as f32 * 50.0; // approximate row height
     crate::scroll_area::scrollbar(
         pixmap,
-        w - 10.0, body_y, body_h,
+        w - 10.0,
+        body_y,
+        body_h,
         body_h / total_h,
         props.scroll_offset,
         total_h,

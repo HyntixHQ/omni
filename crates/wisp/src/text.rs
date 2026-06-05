@@ -244,7 +244,8 @@ impl TextEditor {
     // ── Boundary helpers ──────────────────────────────────────
 
     fn previous_grapheme_boundary(&self, offset: usize) -> usize {
-        let grapheme_offsets: Vec<usize> = self.text.grapheme_indices(true).map(|(i, _)| i).collect();
+        let grapheme_offsets: Vec<usize> =
+            self.text.grapheme_indices(true).map(|(i, _)| i).collect();
         if grapheme_offsets.is_empty() {
             return 0;
         }

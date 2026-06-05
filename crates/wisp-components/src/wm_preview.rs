@@ -9,30 +9,193 @@ pub struct PreviewSpec {
 }
 
 impl PreviewSpec {
-    pub const fn new(x: f32, y: f32, w: f32, h: f32) -> Self { Self { x, y, w, h } }
-    pub const fn full() -> Self { Self { x: 0.0, y: 0.0, w: 1.0, h: 1.0 } }
-    pub const fn left_half() -> Self { Self { x: 0.0, y: 0.0, w: 0.5, h: 1.0 } }
-    pub const fn right_half() -> Self { Self { x: 0.5, y: 0.0, w: 0.5, h: 1.0 } }
-    pub const fn top_half() -> Self { Self { x: 0.0, y: 0.0, w: 1.0, h: 0.5 } }
-    pub const fn bottom_half() -> Self { Self { x: 0.0, y: 0.5, w: 1.0, h: 0.5 } }
-    pub const fn top_left() -> Self { Self { x: 0.0, y: 0.0, w: 0.5, h: 0.5 } }
-    pub const fn top_right() -> Self { Self { x: 0.5, y: 0.0, w: 0.5, h: 0.5 } }
-    pub const fn bottom_left() -> Self { Self { x: 0.0, y: 0.5, w: 0.5, h: 0.5 } }
-    pub const fn bottom_right() -> Self { Self { x: 0.5, y: 0.5, w: 0.5, h: 0.5 } }
-    pub const fn center() -> Self { Self { x: 0.1, y: 0.1, w: 0.8, h: 0.8 } }
-    pub const fn left_third() -> Self { Self { x: 0.0, y: 0.0, w: 1.0 / 3.0, h: 1.0 } }
-    pub const fn center_third() -> Self { Self { x: 1.0 / 3.0, y: 0.0, w: 1.0 / 3.0, h: 1.0 } }
-    pub const fn right_third() -> Self { Self { x: 2.0 / 3.0, y: 0.0, w: 1.0 / 3.0, h: 1.0 } }
-    pub const fn two_thirds_left() -> Self { Self { x: 0.0, y: 0.0, w: 2.0 / 3.0, h: 1.0 } }
-    pub const fn two_thirds_center() -> Self { Self { x: 1.0 / 6.0, y: 0.0, w: 2.0 / 3.0, h: 1.0 } }
-    pub const fn top_left_sixth() -> Self { Self { x: 0.0, y: 0.0, w: 1.0 / 3.0, h: 0.5 } }
-    pub const fn top_center_sixth() -> Self { Self { x: 1.0 / 3.0, y: 0.0, w: 1.0 / 3.0, h: 0.5 } }
-    pub const fn top_right_sixth() -> Self { Self { x: 2.0 / 3.0, y: 0.0, w: 1.0 / 3.0, h: 0.5 } }
-    pub const fn bottom_left_sixth() -> Self { Self { x: 0.0, y: 0.5, w: 1.0 / 3.0, h: 0.5 } }
-    pub const fn bottom_center_sixth() -> Self { Self { x: 1.0 / 3.0, y: 0.5, w: 1.0 / 3.0, h: 0.5 } }
-    pub const fn bottom_right_sixth() -> Self { Self { x: 2.0 / 3.0, y: 0.5, w: 1.0 / 3.0, h: 0.5 } }
-    pub const fn smaller() -> Self { Self { x: 0.1, y: 0.1, w: 0.8, h: 0.8 } }
-    pub const fn larger() -> Self { Self { x: -0.05, y: -0.05, w: 1.1, h: 1.1 } }
+    pub const fn new(x: f32, y: f32, w: f32, h: f32) -> Self {
+        Self { x, y, w, h }
+    }
+    pub const fn full() -> Self {
+        Self {
+            x: 0.0,
+            y: 0.0,
+            w: 1.0,
+            h: 1.0,
+        }
+    }
+    pub const fn left_half() -> Self {
+        Self {
+            x: 0.0,
+            y: 0.0,
+            w: 0.5,
+            h: 1.0,
+        }
+    }
+    pub const fn right_half() -> Self {
+        Self {
+            x: 0.5,
+            y: 0.0,
+            w: 0.5,
+            h: 1.0,
+        }
+    }
+    pub const fn top_half() -> Self {
+        Self {
+            x: 0.0,
+            y: 0.0,
+            w: 1.0,
+            h: 0.5,
+        }
+    }
+    pub const fn bottom_half() -> Self {
+        Self {
+            x: 0.0,
+            y: 0.5,
+            w: 1.0,
+            h: 0.5,
+        }
+    }
+    pub const fn top_left() -> Self {
+        Self {
+            x: 0.0,
+            y: 0.0,
+            w: 0.5,
+            h: 0.5,
+        }
+    }
+    pub const fn top_right() -> Self {
+        Self {
+            x: 0.5,
+            y: 0.0,
+            w: 0.5,
+            h: 0.5,
+        }
+    }
+    pub const fn bottom_left() -> Self {
+        Self {
+            x: 0.0,
+            y: 0.5,
+            w: 0.5,
+            h: 0.5,
+        }
+    }
+    pub const fn bottom_right() -> Self {
+        Self {
+            x: 0.5,
+            y: 0.5,
+            w: 0.5,
+            h: 0.5,
+        }
+    }
+    pub const fn center() -> Self {
+        Self {
+            x: 0.1,
+            y: 0.1,
+            w: 0.8,
+            h: 0.8,
+        }
+    }
+    pub const fn left_third() -> Self {
+        Self {
+            x: 0.0,
+            y: 0.0,
+            w: 1.0 / 3.0,
+            h: 1.0,
+        }
+    }
+    pub const fn center_third() -> Self {
+        Self {
+            x: 1.0 / 3.0,
+            y: 0.0,
+            w: 1.0 / 3.0,
+            h: 1.0,
+        }
+    }
+    pub const fn right_third() -> Self {
+        Self {
+            x: 2.0 / 3.0,
+            y: 0.0,
+            w: 1.0 / 3.0,
+            h: 1.0,
+        }
+    }
+    pub const fn two_thirds_left() -> Self {
+        Self {
+            x: 0.0,
+            y: 0.0,
+            w: 2.0 / 3.0,
+            h: 1.0,
+        }
+    }
+    pub const fn two_thirds_center() -> Self {
+        Self {
+            x: 1.0 / 6.0,
+            y: 0.0,
+            w: 2.0 / 3.0,
+            h: 1.0,
+        }
+    }
+    pub const fn top_left_sixth() -> Self {
+        Self {
+            x: 0.0,
+            y: 0.0,
+            w: 1.0 / 3.0,
+            h: 0.5,
+        }
+    }
+    pub const fn top_center_sixth() -> Self {
+        Self {
+            x: 1.0 / 3.0,
+            y: 0.0,
+            w: 1.0 / 3.0,
+            h: 0.5,
+        }
+    }
+    pub const fn top_right_sixth() -> Self {
+        Self {
+            x: 2.0 / 3.0,
+            y: 0.0,
+            w: 1.0 / 3.0,
+            h: 0.5,
+        }
+    }
+    pub const fn bottom_left_sixth() -> Self {
+        Self {
+            x: 0.0,
+            y: 0.5,
+            w: 1.0 / 3.0,
+            h: 0.5,
+        }
+    }
+    pub const fn bottom_center_sixth() -> Self {
+        Self {
+            x: 1.0 / 3.0,
+            y: 0.5,
+            w: 1.0 / 3.0,
+            h: 0.5,
+        }
+    }
+    pub const fn bottom_right_sixth() -> Self {
+        Self {
+            x: 2.0 / 3.0,
+            y: 0.5,
+            w: 1.0 / 3.0,
+            h: 0.5,
+        }
+    }
+    pub const fn smaller() -> Self {
+        Self {
+            x: 0.1,
+            y: 0.1,
+            w: 0.8,
+            h: 0.8,
+        }
+    }
+    pub const fn larger() -> Self {
+        Self {
+            x: -0.05,
+            y: -0.05,
+            w: 1.1,
+            h: 1.1,
+        }
+    }
 }
 
 pub struct PreviewColors {
@@ -80,7 +243,10 @@ pub fn draw_preview(
         let mut paint = Paint::default();
         paint.set_color(colors.outline);
         paint.anti_alias = true;
-        let stroke = Stroke { width: 1.0, ..Stroke::default() };
+        let stroke = Stroke {
+            width: 1.0,
+            ..Stroke::default()
+        };
         pixmap.stroke_path(&path, &paint, &stroke, Transform::identity(), None);
     }
 
@@ -110,11 +276,26 @@ pub fn draw_preview(
     let wr = 1.0;
     pb.move_to(win_clamp_x + wr, win_clamp_y);
     pb.line_to(win_clamp_x + win_clamp_w - wr, win_clamp_y);
-    pb.quad_to(win_clamp_x + win_clamp_w, win_clamp_y, win_clamp_x + win_clamp_w, win_clamp_y + wr);
+    pb.quad_to(
+        win_clamp_x + win_clamp_w,
+        win_clamp_y,
+        win_clamp_x + win_clamp_w,
+        win_clamp_y + wr,
+    );
     pb.line_to(win_clamp_x + win_clamp_w, win_clamp_y + win_clamp_h - wr);
-    pb.quad_to(win_clamp_x + win_clamp_w, win_clamp_y + win_clamp_h, win_clamp_x + win_clamp_w - wr, win_clamp_y + win_clamp_h);
+    pb.quad_to(
+        win_clamp_x + win_clamp_w,
+        win_clamp_y + win_clamp_h,
+        win_clamp_x + win_clamp_w - wr,
+        win_clamp_y + win_clamp_h,
+    );
     pb.line_to(win_clamp_x + wr, win_clamp_y + win_clamp_h);
-    pb.quad_to(win_clamp_x, win_clamp_y + win_clamp_h, win_clamp_x, win_clamp_y + win_clamp_h - wr);
+    pb.quad_to(
+        win_clamp_x,
+        win_clamp_y + win_clamp_h,
+        win_clamp_x,
+        win_clamp_y + win_clamp_h - wr,
+    );
     pb.line_to(win_clamp_x, win_clamp_y + wr);
     pb.quad_to(win_clamp_x, win_clamp_y, win_clamp_x + wr, win_clamp_y);
     pb.close();
@@ -122,6 +303,12 @@ pub fn draw_preview(
         let mut paint = Paint::default();
         paint.set_color(colors.accent);
         paint.anti_alias = true;
-        pixmap.fill_path(&path, &paint, FillRule::Winding, Transform::identity(), None);
+        pixmap.fill_path(
+            &path,
+            &paint,
+            FillRule::Winding,
+            Transform::identity(),
+            None,
+        );
     }
 }

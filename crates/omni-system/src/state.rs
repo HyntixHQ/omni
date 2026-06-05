@@ -92,7 +92,9 @@ impl SystemState {
 }
 
 impl Default for SystemState {
-    fn default() -> Self { Self::new() }
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 pub fn handle_action(state: &mut SystemState, action: InputAction, _row_height: f32, _body_h: f32) {
@@ -105,7 +107,11 @@ pub fn handle_action(state: &mut SystemState, action: InputAction, _row_height: 
     }
 }
 
-pub fn compute_row_height(font_system: &mut cosmic_text::FontSystem, font_size: f32, font_family: &str) -> f32 {
+pub fn compute_row_height(
+    font_system: &mut cosmic_text::FontSystem,
+    font_size: f32,
+    font_family: &str,
+) -> f32 {
     row_height(font_system, font_size, font_family)
 }
 
@@ -145,7 +151,13 @@ pub fn draw_system(
     }
 
     input::input(
-        pixmap, font_system, swash_cache, pad, 6.0, inner_w, header_h,
+        pixmap,
+        font_system,
+        swash_cache,
+        pad,
+        6.0,
+        inner_w,
+        header_h,
         &input::InputProps {
             value: &state.filter,
             cursor_at: state.filter.len(),
@@ -217,26 +229,43 @@ pub fn draw_system(
     let _ = sel;
 
     draw_list(
-        pixmap, font_system, swash_cache,
-        pad, list_y, inner_w, list_h,
-        mouse_y, &items, &mut state.list_state,
-        font_size, font_family, &list_colors,
+        pixmap,
+        font_system,
+        swash_cache,
+        pad,
+        list_y,
+        inner_w,
+        list_h,
+        mouse_y,
+        &items,
+        &mut state.list_state,
+        font_size,
+        font_family,
+        &list_colors,
     );
 
     let _ = (accent, dim_fg, destructive_fg);
     let hint_y = h - footer_h + 4.0;
-    let hint_text = format!("{} · {} commands", compositor_name(state.compositor), list_len);
+    let hint_text = format!(
+        "{} · {} commands",
+        compositor_name(state.compositor),
+        list_len
+    );
     let hint_w = draw::text_width(font_system, &hint_text, 11.0, font_family);
     draw::draw_text(
-        pixmap, font_system, swash_cache,
-        &hint_text, w - pad - hint_w, hint_y + 4.0, 11.0, font_family, desc_fg,
+        pixmap,
+        font_system,
+        swash_cache,
+        &hint_text,
+        w - pad - hint_w,
+        hint_y + 4.0,
+        11.0,
+        font_family,
+        desc_fg,
     );
 
     let mut badge_x = pad;
-    let visible_first = state
-        .list_state
-        .hover_index
-        .unwrap_or(sel);
+    let visible_first = state.list_state.hover_index.unwrap_or(sel);
     if let Some(item) = filtered.get(visible_first) {
         let badge_colors = BadgeColors {
             bg: Color::from_rgba8(0, 0, 0, 0),
@@ -244,14 +273,18 @@ pub fn draw_system(
             border: Some(border),
         };
         let (bw, _) = badge(
-            pixmap, font_system, swash_cache,
-            badge_x, hint_y + 2.0,
+            pixmap,
+            font_system,
+            swash_cache,
+            badge_x,
+            hint_y + 2.0,
             &BadgeProps {
                 text: &item.category,
                 variant: BadgeVariant::Outline,
                 focused: false,
                 colors: Some(badge_colors),
                 icon: None,
+                lucide_icon: None,
             },
             font_family,
         );
@@ -263,14 +296,18 @@ pub fn draw_system(
                 border: None,
             };
             let (bw, _) = badge(
-                pixmap, font_system, swash_cache,
-                badge_x, hint_y + 2.0,
+                pixmap,
+                font_system,
+                swash_cache,
+                badge_x,
+                hint_y + 2.0,
                 &BadgeProps {
                     text: "destructive",
                     variant: BadgeVariant::Destructive,
                     focused: false,
                     colors: Some(badge_colors),
                     icon: None,
+                    lucide_icon: None,
                 },
                 font_family,
             );

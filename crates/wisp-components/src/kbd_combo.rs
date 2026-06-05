@@ -34,7 +34,12 @@ pub fn kbd_combo(
     font_family: &str,
 ) -> (f32, f32) {
     let parts: Vec<&str> = if props.keys.contains('+') {
-        props.keys.split('+').map(str::trim).filter(|s| !s.is_empty()).collect()
+        props
+            .keys
+            .split('+')
+            .map(str::trim)
+            .filter(|s| !s.is_empty())
+            .collect()
     } else {
         vec![props.keys]
     };
@@ -99,7 +104,12 @@ pub fn measure_kbd_combo(
     font_family: &str,
 ) -> f32 {
     let parts: Vec<&str> = if props.keys.contains('+') {
-        props.keys.split('+').map(str::trim).filter(|s| !s.is_empty()).collect()
+        props
+            .keys
+            .split('+')
+            .map(str::trim)
+            .filter(|s| !s.is_empty())
+            .collect()
     } else {
         vec![props.keys]
     };
@@ -116,7 +126,13 @@ pub fn measure_kbd_combo(
         if i > 0 {
             total += sep_advance;
         }
-        let (w, _h) = measure_kbd(font_system, part, props.font_size, props.padding_x, font_family);
+        let (w, _h) = measure_kbd(
+            font_system,
+            part,
+            props.font_size,
+            props.padding_x,
+            font_family,
+        );
         total += w;
     }
     total
@@ -127,7 +143,11 @@ mod tests {
     #[test]
     fn splits_on_plus() {
         assert_eq!(
-            "Super+Alt+S".split('+').map(str::trim).filter(|s| !s.is_empty()).collect::<Vec<_>>(),
+            "Super+Alt+S"
+                .split('+')
+                .map(str::trim)
+                .filter(|s| !s.is_empty())
+                .collect::<Vec<_>>(),
             vec!["Super", "Alt", "S"]
         );
     }
@@ -145,7 +165,10 @@ mod tests {
     #[test]
     fn empty_string_yields_no_parts() {
         let parts: Vec<&str> = if "".contains('+') {
-            "".split('+').map(str::trim).filter(|s| !s.is_empty()).collect()
+            "".split('+')
+                .map(str::trim)
+                .filter(|s| !s.is_empty())
+                .collect()
         } else {
             vec![""]
         };

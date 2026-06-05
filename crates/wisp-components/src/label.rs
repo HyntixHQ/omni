@@ -44,6 +44,16 @@ pub fn label(
         (c.blue() * 255.0) as u8,
         a,
     );
-    draw::draw_text(pixmap, font_system, swash_cache, props.text, x, y, props.font_size, font_family, c);
+    draw::draw_text(
+        pixmap,
+        font_system,
+        swash_cache,
+        props.text,
+        x,
+        y,
+        props.font_size,
+        font_family,
+        c,
+    );
     y + props.font_size
 }

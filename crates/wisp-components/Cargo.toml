@@ -16,3 +16,4 @@ wisp = { path = "../wisp" }
 tiny-skia.workspace = true
 cosmic-text.workspace = true
 unicode-segmentation = "1"
+lucide-icons.workspace = true

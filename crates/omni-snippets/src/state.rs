@@ -337,15 +337,12 @@ pub fn handle_action(state: &mut SnippetsState, action: InputAction) {
                 }
                 InputAction::MoveCursorLeft => {
                     if let Some(ed) = state.active_editor() {
-                        ed.cursor = ed.text[..ed.cursor]
-                            .chars()
-                            .next_back()
-                            .map_or(0, |_| {
-                                ed.text[..ed.cursor]
-                                    .char_indices()
-                                    .last()
-                                    .map_or(0, |(i, _)| i)
-                            });
+                        ed.cursor = ed.text[..ed.cursor].chars().next_back().map_or(0, |_| {
+                            ed.text[..ed.cursor]
+                                .char_indices()
+                                .last()
+                                .map_or(0, |(i, _)| i)
+                        });
                     }
                 }
                 InputAction::MoveCursorRight => {
@@ -369,12 +366,10 @@ pub fn handle_action(state: &mut SnippetsState, action: InputAction) {
             }
         }
         SnippetMode::ConfirmDelete { .. } => match action {
-            InputAction::Confirm
-            | InputAction::AppendChar('y')
-            | InputAction::AppendChar('Y') => state.confirm_delete(),
-            InputAction::Cancel
-            | InputAction::AppendChar('n')
-            | InputAction::AppendChar('N') => {
+            InputAction::Confirm | InputAction::AppendChar('y') | InputAction::AppendChar('Y') => {
+                state.confirm_delete()
+            }
+            InputAction::Cancel | InputAction::AppendChar('n') | InputAction::AppendChar('N') => {
                 state.mode = SnippetMode::Browse;
             }
             _ => {}
@@ -382,7 +377,11 @@ pub fn handle_action(state: &mut SnippetsState, action: InputAction) {
     }
 }
 
-pub fn compute_row_height(font_system: &mut cosmic_text::FontSystem, font_size: f32, font_family: &str) -> f32 {
+pub fn compute_row_height(
+    font_system: &mut cosmic_text::FontSystem,
+    font_size: f32,
+    font_family: &str,
+) -> f32 {
     row_height(font_system, font_size, font_family)
 }
 
@@ -424,23 +423,69 @@ pub fn draw_snippets(
 
     match &state.mode {
         SnippetMode::Browse => draw_browse(
-            pixmap, font_system, swash_cache, w, h, pad, fg, selected_bg, dim_fg,
-            desc_fg, accent, border, placeholder_fg, caret, font_size, font_family,
-            state, cursor_visible, mouse_y,
+            pixmap,
+            font_system,
+            swash_cache,
+            w,
+            h,
+            pad,
+            fg,
+            selected_bg,
+            dim_fg,
+            desc_fg,
+            accent,
+            border,
+            placeholder_fg,
+            caret,
+            font_size,
+            font_family,
+            state,
+            cursor_visible,
+            mouse_y,
         ),
         SnippetMode::Form { field, error, .. } => {
             let field = *field;
             let error = error.clone();
             draw_form(
-                pixmap, font_system, swash_cache, w, h, pad, fg, dim_fg, desc_fg,
-                border, placeholder_fg, caret, font_size, font_family, state,
-                cursor_visible, mouse_y, field, error,
+                pixmap,
+                font_system,
+                swash_cache,
+                w,
+                h,
+                pad,
+                fg,
+                dim_fg,
+                desc_fg,
+                border,
+                placeholder_fg,
+                caret,
+                font_size,
+                font_family,
+                state,
+                cursor_visible,
+                mouse_y,
+                field,
+                error,
             );
         }
         SnippetMode::ConfirmDelete { index } => {
             draw_confirm(
-                pixmap, font_system, swash_cache, w, h, pad, fg, dim_fg, desc_fg,
-                border, caret, font_size, font_family, state, mouse_y, *index,
+                pixmap,
+                font_system,
+                swash_cache,
+                w,
+                h,
+                pad,
+                fg,
+                dim_fg,
+                desc_fg,
+                border,
+                caret,
+                font_size,
+                font_family,
+                state,
+                mouse_y,
+                *index,
             );
         }
     }
@@ -475,7 +520,13 @@ fn draw_browse(
     let inner_w = w - pad * 2.0;
 
     input::input(
-        pixmap, font_system, swash_cache, pad, 6.0, inner_w, header_h,
+        pixmap,
+        font_system,
+        swash_cache,
+        pad,
+        6.0,
+        inner_w,
+        header_h,
         &input::InputProps {
             value: &state.filter,
             cursor_at: state.filter.len(),
@@ -547,10 +598,19 @@ fn draw_browse(
         .collect();
 
     draw_list(
-        pixmap, font_system, swash_cache,
-        pad, list_y, inner_w, list_h,
-        mouse_y, &items, &mut state.list_state,
-        font_size, font_family, &list_colors,
+        pixmap,
+        font_system,
+        swash_cache,
+        pad,
+        list_y,
+        inner_w,
+        list_h,
+        mouse_y,
+        &items,
+        &mut state.list_state,
+        font_size,
+        font_family,
+        &list_colors,
     );
 
     let hint_y = h - footer_h + 4.0;
@@ -564,14 +624,18 @@ fn draw_browse(
                 border: Some(border),
             };
             let (bw, _) = badge(
-                pixmap, font_system, swash_cache,
-                badge_x, hint_y + 2.0,
+                pixmap,
+                font_system,
+                swash_cache,
+                badge_x,
+                hint_y + 2.0,
                 &BadgeProps {
                     text: sc,
                     variant: BadgeVariant::Outline,
                     focused: false,
                     colors: Some(badge_colors),
                     icon: None,
+                    lucide_icon: None,
                 },
                 font_family,
             );
@@ -593,15 +657,29 @@ fn draw_browse(
     if let Some(text) = saved_text {
         let tw = draw::text_width(font_system, text, 11.0, font_family);
         draw::draw_text(
-            pixmap, font_system, swash_cache,
-            text, w - pad - tw, hint_y + 4.0, 11.0, font_family, accent,
+            pixmap,
+            font_system,
+            swash_cache,
+            text,
+            w - pad - tw,
+            hint_y + 4.0,
+            11.0,
+            font_family,
+            accent,
         );
     } else {
         let hint_text = format!("{} snippets", list_len);
         let hint_w = draw::text_width(font_system, &hint_text, 11.0, font_family);
         draw::draw_text(
-            pixmap, font_system, swash_cache,
-            &hint_text, w - pad - hint_w, hint_y + 4.0, 11.0, font_family, desc_fg,
+            pixmap,
+            font_system,
+            swash_cache,
+            &hint_text,
+            w - pad - hint_w,
+            hint_y + 4.0,
+            11.0,
+            font_family,
+            desc_fg,
         );
     }
 
@@ -634,49 +712,111 @@ fn draw_form(
     let inner_w = w - pad * 2.0;
     let mut y = pad + 6.0;
 
-    let is_edit = matches!(state.mode, SnippetMode::Form { editing: Some(_), .. });
-    let title = if is_edit { "Edit snippet" } else { "New snippet" };
+    let is_edit = matches!(
+        state.mode,
+        SnippetMode::Form {
+            editing: Some(_),
+            ..
+        }
+    );
+    let title = if is_edit {
+        "Edit snippet"
+    } else {
+        "New snippet"
+    };
     draw::draw_text(
-        pixmap, font_system, swash_cache,
-        title, pad, y, font_size, font_family, fg,
+        pixmap,
+        font_system,
+        swash_cache,
+        title,
+        pad,
+        y,
+        font_size,
+        font_family,
+        fg,
     );
     y += font_size + 10.0;
 
     let _ = (FormField::Name, FormField::Shortcut, FormField::Content);
 
     y += draw_form_field(
-        pixmap, font_system, swash_cache,
-        pad, y, inner_w,
-        "Name *", active_field == FormField::Name,
-        &state.form_name.text, state.form_name.cursor, cursor_visible && active_field == FormField::Name,
-        fg, dim_fg, border, placeholder_fg, caret,
-        font_size, font_family, FORM_NAME_H,
+        pixmap,
+        font_system,
+        swash_cache,
+        pad,
+        y,
+        inner_w,
+        "Name *",
+        active_field == FormField::Name,
+        &state.form_name.text,
+        state.form_name.cursor,
+        cursor_visible && active_field == FormField::Name,
+        fg,
+        dim_fg,
+        border,
+        placeholder_fg,
+        caret,
+        font_size,
+        font_family,
+        FORM_NAME_H,
     );
     y += FORM_FIELD_GAP;
 
     y += draw_form_field(
-        pixmap, font_system, swash_cache,
-        pad, y, inner_w,
-        "Shortcut (optional)", active_field == FormField::Shortcut,
-        &state.form_shortcut.text, state.form_shortcut.cursor, cursor_visible && active_field == FormField::Shortcut,
-        fg, dim_fg, border, placeholder_fg, caret,
-        font_size, font_family, FORM_SHORTCUT_H,
+        pixmap,
+        font_system,
+        swash_cache,
+        pad,
+        y,
+        inner_w,
+        "Shortcut (optional)",
+        active_field == FormField::Shortcut,
+        &state.form_shortcut.text,
+        state.form_shortcut.cursor,
+        cursor_visible && active_field == FormField::Shortcut,
+        fg,
+        dim_fg,
+        border,
+        placeholder_fg,
+        caret,
+        font_size,
+        font_family,
+        FORM_SHORTCUT_H,
     );
     y += FORM_FIELD_GAP;
 
     y += draw_form_field(
-        pixmap, font_system, swash_cache,
-        pad, y, inner_w,
-        "Content *", active_field == FormField::Content,
-        &state.form_content.text, state.form_content.cursor, cursor_visible && active_field == FormField::Content,
-        fg, dim_fg, border, placeholder_fg, caret,
-        font_size, font_family, FORM_CONTENT_H,
+        pixmap,
+        font_system,
+        swash_cache,
+        pad,
+        y,
+        inner_w,
+        "Content *",
+        active_field == FormField::Content,
+        &state.form_content.text,
+        state.form_content.cursor,
+        cursor_visible && active_field == FormField::Content,
+        fg,
+        dim_fg,
+        border,
+        placeholder_fg,
+        caret,
+        font_size,
+        font_family,
+        FORM_CONTENT_H,
     );
 
     if let Some(ref err) = error {
         draw::draw_text(
-            pixmap, font_system, swash_cache,
-            err, pad, y + 4.0, 11.0, font_family,
+            pixmap,
+            font_system,
+            swash_cache,
+            err,
+            pad,
+            y + 4.0,
+            11.0,
+            font_family,
             color_from_hex("#ef4444"),
         );
     }
@@ -685,8 +825,15 @@ fn draw_form(
     let hint = "Tab  next   Ctrl+S  save   Esc  cancel";
     let hint_w = draw::text_width(font_system, hint, 11.0, font_family);
     draw::draw_text(
-        pixmap, font_system, swash_cache,
-        hint, w - pad - hint_w, hint_y, 11.0, font_family, desc_fg,
+        pixmap,
+        font_system,
+        swash_cache,
+        hint,
+        w - pad - hint_w,
+        hint_y,
+        11.0,
+        font_family,
+        desc_fg,
     );
 }
 
@@ -715,8 +862,15 @@ fn draw_form_field(
     let _ = dim_fg;
     let label_color = if focused { fg } else { dim_fg };
     draw::draw_text(
-        pixmap, font_system, swash_cache,
-        label, x, y, 11.0, font_family, label_color,
+        pixmap,
+        font_system,
+        swash_cache,
+        label,
+        x,
+        y,
+        11.0,
+        font_family,
+        label_color,
     );
 
     let input_y = y + FORM_FIELD_LABEL_H;
@@ -738,10 +892,18 @@ fn draw_form_field(
     let draw_caret = cursor_visible && focused;
 
     draw::draw_text_clipped(
-        pixmap, font_system, swash_cache,
-        x + 8.0, input_box_y + 8.0,
-        display_value, font_size, font_family, fg,
-        input_box_y, input_box_y + input_box_h, w - 16.0,
+        pixmap,
+        font_system,
+        swash_cache,
+        x + 8.0,
+        input_box_y + 8.0,
+        display_value,
+        font_size,
+        font_family,
+        fg,
+        input_box_y,
+        input_box_y + input_box_h,
+        w - 16.0,
     );
 
     let _ = (placeholder, placeholder_fg, caret, border, bg_color, cursor);
@@ -752,7 +914,14 @@ fn draw_form_field(
         0.0
     };
     if draw_caret {
-        draw::fill_rect(pixmap, caret_x.round(), input_box_y + 6.0, 1.5, input_box_h - 12.0, caret);
+        draw::fill_rect(
+            pixmap,
+            caret_x.round(),
+            input_box_y + 6.0,
+            1.5,
+            input_box_h - 12.0,
+            caret,
+        );
     }
 
     let rect_color = if focused {
@@ -798,19 +967,40 @@ fn draw_confirm(
     let line1 = format!("Delete '{}'?", name);
     let line2 = "This cannot be undone.";
     draw::draw_text(
-        pixmap, font_system, swash_cache,
-        &line1, pad, cy, font_size, font_family, fg,
+        pixmap,
+        font_system,
+        swash_cache,
+        &line1,
+        pad,
+        cy,
+        font_size,
+        font_family,
+        fg,
     );
     draw::draw_text(
-        pixmap, font_system, swash_cache,
-        line2, pad, cy + font_size + 6.0, 12.0, font_family, desc_fg,
+        pixmap,
+        font_system,
+        swash_cache,
+        line2,
+        pad,
+        cy + font_size + 6.0,
+        12.0,
+        font_family,
+        desc_fg,
     );
 
     let hint = "Y  delete    N / Esc  cancel";
     let hint_w = draw::text_width(font_system, hint, 11.0, font_family);
     draw::draw_text(
-        pixmap, font_system, swash_cache,
-        hint, w - pad - hint_w, h - 24.0, 11.0, font_family, desc_fg,
+        pixmap,
+        font_system,
+        swash_cache,
+        hint,
+        w - pad - hint_w,
+        h - 24.0,
+        11.0,
+        font_family,
+        desc_fg,
     );
     let _ = inner_w;
 }

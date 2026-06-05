@@ -44,7 +44,17 @@ pub fn kbd(
 
     let text_x = x + (bw - text_w) / 2.0;
     let text_y = y + (bh - text_h) / 2.0;
-    draw::draw_text(pixmap, font_system, swash_cache, props.keys, text_x, text_y, props.font_size, font_family, fg);
+    draw::draw_text(
+        pixmap,
+        font_system,
+        swash_cache,
+        props.keys,
+        text_x,
+        text_y,
+        props.font_size,
+        font_family,
+        fg,
+    );
 
     (bw, bh)
 }
