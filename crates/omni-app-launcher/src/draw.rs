@@ -151,6 +151,7 @@ fn draw_launcher_footer(
     let shortcuts_left = [
         ("\u{2191}\u{2193}", "Navigate", wisp_components::badge::BadgeVariant::Secondary),
         ("\u{23CE}", "Launch", wisp_components::badge::BadgeVariant::Secondary),
+        ("F1", "Shortcuts", wisp_components::badge::BadgeVariant::Secondary),
     ];
 
     let mut cx = padding;

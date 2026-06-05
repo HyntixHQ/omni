@@ -42,7 +42,9 @@ impl ListState {
     }
 
     pub fn select_next(&mut self, max: usize) {
-        if max == 0 { return; }
+        if max == 0 {
+            return;
+        }
         self.selected_index = (self.selected_index + 1).min(max - 1);
     }
 
@@ -53,7 +55,11 @@ impl ListState {
     pub fn set_hover(&mut self, y: f32, row_height: f32) {
         let scroll_y = -self.scroll.offset();
         let rel_y = y + scroll_y;
-        self.hover_index = if rel_y >= 0.0 { Some((rel_y / row_height) as usize) } else { None };
+        self.hover_index = if rel_y >= 0.0 {
+            Some((rel_y / row_height) as usize)
+        } else {
+            None
+        };
     }
 
     pub fn clear_hover(&mut self) {
@@ -63,7 +69,11 @@ impl ListState {
     pub fn index_at(&self, y: f32, row_height: f32) -> Option<usize> {
         let scroll_y = -self.scroll.offset();
         let rel_y = y + scroll_y;
-        if rel_y >= 0.0 { Some((rel_y / row_height) as usize) } else { None }
+        if rel_y >= 0.0 {
+            Some((rel_y / row_height) as usize)
+        } else {
+            None
+        }
     }
 }
 
@@ -88,7 +98,11 @@ pub struct ListColors {
 }
 
 /// Compute row height from font metrics.
-pub fn row_height(font_system: &mut cosmic_text::FontSystem, font_size: f32, font_family: &str) -> f32 {
+pub fn row_height(
+    font_system: &mut cosmic_text::FontSystem,
+    font_size: f32,
+    font_family: &str,
+) -> f32 {
     let desc_size = font_size - 2.0;
     let (n_ascent, n_descent) = draw::text_metrics(font_system, "Ag", font_size, font_family);
     let (d_ascent, d_descent) = draw::text_metrics(font_system, "Ag", desc_size, font_family);
@@ -96,7 +110,11 @@ pub fn row_height(font_system: &mut cosmic_text::FontSystem, font_size: f32, fon
 }
 
 /// Compute compact row height for items without subtitle.
-pub fn row_height_compact(font_system: &mut cosmic_text::FontSystem, font_size: f32, font_family: &str) -> f32 {
+pub fn row_height_compact(
+    font_system: &mut cosmic_text::FontSystem,
+    font_size: f32,
+    font_family: &str,
+) -> f32 {
     let (n_ascent, n_descent) = draw::text_metrics(font_system, "Ag", font_size, font_family);
     let name_h = n_ascent + n_descent;
     name_h + 12.0
@@ -120,9 +138,9 @@ pub fn draw_list(
     colors: &ListColors,
 ) {
     let desc_size = font_size - 2.0;
-    let icon_size = 28.0;  // matches IconCache default render size
-    let padding_x = 8.0;   // shadcn: px-2
-    let gap = 8.0;         // shadcn: gap-2
+    let icon_size = 28.0; // matches IconCache default render size
+    let padding_x = 8.0; // shadcn: px-2
+    let gap = 8.0; // shadcn: gap-2
 
     let (n_ascent, n_descent) = draw::text_metrics(font_system, "Ag", font_size, font_family);
     let (d_ascent, d_descent) = draw::text_metrics(font_system, "Ag", desc_size, font_family);
@@ -167,17 +185,47 @@ pub fn draw_list(
         let is_active = item.selected && colors.active_highlight;
 
         // Items clipped to per-row bounds — background, text, icons all clip individually
+        let clip_min = row_y.max(y);
+        let clip_max = (row_y + row_h_actual).min(y + h);
+
         if item.selected || is_hovered {
-            let bg = if item.selected { colors.active_bg } else { colors.hover };
-            draw::fill_rect_clipped(pixmap, x, row_y, w, row_h_actual, 4.0, bg, row_y, row_y + row_h_actual);
+            let bg = if item.selected {
+                colors.active_bg
+            } else {
+                colors.hover
+            };
+            draw::fill_rect_clipped(
+                pixmap,
+                x,
+                row_y,
+                w,
+                row_h_actual,
+                4.0,
+                bg,
+                clip_min,
+                clip_max,
+            );
         }
 
         // Border — only when fully visible (no partial border overflow)
         if is_active && row_y >= y && row_bot <= y + h {
-            draw::stroke_rounded_rect(pixmap, x + 0.5, row_y + 0.5, w - 1.0, row_h_actual - 1.0, 4.0, colors.active_border, 1.0);
+            draw::stroke_rounded_rect(
+                pixmap,
+                x + 0.5,
+                row_y + 0.5,
+                w - 1.0,
+                row_h_actual - 1.0,
+                4.0,
+                colors.active_border,
+                1.0,
+            );
         }
 
-        let name_color = if item.selected { colors.selected_fg } else { colors.fg };
+        let name_color = if item.selected {
+            colors.selected_fg
+        } else {
+            colors.fg
+        };
 
         let has_prefix = item.prefix_icon.is_some();
         let has_suffix = item.suffix_icon.is_some();
@@ -187,31 +235,71 @@ pub fn draw_list(
         let icon_x = x + padding_x;
 
         if let Some(icon) = item.prefix_icon {
-            draw::draw_pixmap_clipped(pixmap, icon, icon_x, icon_y, row_y, row_y + row_h_actual);
+            draw::draw_pixmap_clipped(pixmap, icon, icon_x, icon_y, clip_min, clip_max);
         }
 
-        let text_x = if has_prefix { x + padding_x + icon_size + gap } else { x + padding_x };
-        let max_text_w = if has_suffix { w - (text_x - x) - padding_x - icon_size - gap } else { w - (text_x - x) - padding_x };
-        let content_h = if item.subtitle.is_some() { row_content_h } else { name_h };
+        let text_x = if has_prefix {
+            x + padding_x + icon_size + gap
+        } else {
+            x + padding_x
+        };
+        let max_text_w = if has_suffix {
+            w - (text_x - x) - padding_x - icon_size - gap
+        } else {
+            w - (text_x - x) - padding_x
+        };
+        let content_h = if item.subtitle.is_some() {
+            row_content_h
+        } else {
+            name_h
+        };
         let text_y = (row_y + (row_h - 4.0 - content_h) / 2.0).round();
 
         // Title — clip to name line area only (prevents wrap bleed into subtitle space)
         draw::draw_text_clipped(
-            pixmap, font_system, swash_cache,
-            text_x, text_y, item.title, font_size, font_family, name_color,
-            text_y, text_y + name_h, max_text_w,
+            pixmap,
+            font_system,
+            swash_cache,
+            text_x,
+            text_y,
+            item.title,
+            font_size,
+            font_family,
+            name_color,
+            text_y.max(y),
+            (text_y + name_h).min(y + h),
+            max_text_w,
         );
 
         // Subtitle
         if let Some(desc) = item.subtitle {
             let desc_y = (text_y + name_h + 2.0).round();
-            let desc_color = if item.selected { colors.selected_desc_fg } else { colors.desc_fg };
+            let desc_color = if item.selected {
+                colors.selected_desc_fg
+            } else {
+                colors.desc_fg
+            };
             // Subtitle — clip to desc line area only
             draw::draw_text_clipped(
-                pixmap, font_system, swash_cache,
-                text_x, desc_y, desc, desc_size, font_family, desc_color,
-                desc_y, desc_y + desc_h, max_text_w,
+                pixmap,
+                font_system,
+                swash_cache,
+                text_x,
+                desc_y,
+                desc,
+                desc_size,
+                font_family,
+                desc_color,
+                desc_y.max(y),
+                (desc_y + desc_h).min(y + h),
+                max_text_w,
             );
+        }
+
+        // Suffix icon
+        if let Some(suffix) = item.suffix_icon {
+            let sx = (x + w - padding_x - icon_size).round();
+            draw::draw_pixmap_clipped(pixmap, suffix, sx, icon_y, clip_min, clip_max);
         }
 
         // Suffix icon

@@ -381,6 +381,12 @@ fn run_daemon(config: Config) {
             keys: keys.clone(),
         });
     }
+    if let Some(keys) = &config.shortcuts.help {
+        shortcuts.push(omni_daemon::sway_backend::ShortcutEntry {
+            id: "help".into(),
+            keys: keys.clone(),
+        });
+    }
     for (app_id, keys) in &config.shortcuts.apps {
         shortcuts.push(omni_daemon::sway_backend::ShortcutEntry {
             id: format!("app:{}", app_id),
@@ -1080,6 +1086,10 @@ fn handle_shortcut(id: &str, config: &Config) {
         "snippets" => {
             let mut socket = ipc_connect();
             let _ = socket.write_all(b"snippets\n");
+        }
+        "help" => {
+            let mut socket = ipc_connect();
+            let _ = socket.write_all(b"help\n");
         }
         app_id => {
             let clean_id = app_id.strip_prefix("app:").unwrap_or(app_id);
